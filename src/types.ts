@@ -52,18 +52,6 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     defaultModel: 'yi-lightning',
     requiresKey: true,
   },
-  doubao: {
-    name: 'Doubao (豆包/字节)',
-    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-    defaultModel: 'doubao-lite-4k',
-    requiresKey: true,
-  },
-  spark: {
-    name: 'Spark (讯飞星火)',
-    baseUrl: 'https://spark-api-open.xf-yun.com/v1',
-    defaultModel: 'generalv3.5',
-    requiresKey: true,
-  },
   // 国际大模型
   openai: {
     name: 'OpenAI',
