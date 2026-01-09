@@ -84,8 +84,6 @@ git-ai
 | **Moonshot** (月之暗面) | `moonshot-v1-8k` | [platform.moonshot.cn](https://platform.moonshot.cn/) |
 | **Baichuan** (百川) | `Baichuan4` | [platform.baichuan-ai.com](https://platform.baichuan-ai.com/) |
 | **Yi** (零一万物) | `yi-lightning` | [platform.lingyiwanwu.com](https://platform.lingyiwanwu.com/) |
-| **Doubao** (豆包) | `doubao-lite-4k` | [console.volcengine.com](https://console.volcengine.com/ark) |
-| **Spark** (讯飞星火) | `generalv3.5` | [xinghuo.xfyun.cn](https://xinghuo.xfyun.cn/) |
 | **SiliconFlow** (硅基流动) | `Qwen2.5-7B` | [cloud.siliconflow.cn](https://cloud.siliconflow.cn/) |
 
 ### 国际大模型
