@@ -9,10 +9,10 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/git-ai-cli"><img src="https://img.shields.io/npm/v/git-ai-cli.svg?style=flat-square" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/git-ai-cli"><img src="https://img.shields.io/npm/dm/git-ai-cli.svg?style=flat-square" alt="npm downloads"></a>
-  <a href="https://github.com/dongowu/git-ai-cli/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/git-ai-cli.svg?style=flat-square" alt="license"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/git-ai-cli.svg?style=flat-square" alt="node version"></a>
+  <a href="https://www.npmjs.com/package/@dongowu/git-ai-cli"><img src="https://img.shields.io/npm/v/@dongowu/git-ai-cli.svg?style=flat-square" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/@dongowu/git-ai-cli"><img src="https://img.shields.io/npm/dm/@dongowu/git-ai-cli.svg?style=flat-square" alt="npm downloads"></a>
+  <a href="https://github.com/dongowu/git-ai-cli/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/@dongowu/git-ai-cli.svg?style=flat-square" alt="license"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/@dongowu/git-ai-cli.svg?style=flat-square" alt="node version"></a>
 </p>
 
 <p align="center">
@@ -51,7 +51,7 @@ $ git-ai
 
 ```bash
 # 安装
-npm install -g git-ai-cli
+npm install -g @dongowu/git-ai-cli
 
 # 配置 (选择 AI 服务商，输入 API Key)
 git-ai config
@@ -148,7 +148,7 @@ git-ai config
 ### Installation
 
 ```bash
-npm install -g git-ai-cli
+npm install -g @dongowu/git-ai-cli
 ```
 
 ### Quick Start
