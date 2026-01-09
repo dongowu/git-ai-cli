@@ -1,5 +1,5 @@
 {
-  "name": "git-ai-cli",
+  "name": "@dongowu/git-ai-cli",
   "version": "1.0.0",
   "description": "Fast, privacy-first, bring-your-own-model Git commit message generator",
   "type": "module",
