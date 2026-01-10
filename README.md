@@ -69,6 +69,9 @@ git-ai
 | 🏠 **本地部署** | 支持 Ollama、LM Studio，数据不出本机 |
 | 🔍 **智能 Diff** | 自动过滤 lock 文件，Token 优化截断 |
 | 💬 **交互式** | 提交 / 编辑 / 重新生成 / 取消 |
+| ⚡ **一键提交** | `-y` 参数跳过确认，CI/CD 友好 |
+| 🎯 **多条候选** | `-n 3` 生成多条消息供选择 |
+| 🪝 **Git Hook** | 自动集成到 git commit 流程 |
 | 📝 **规范化** | 遵循 Conventional Commits 标准 |
 | 🌍 **中英双语** | 支持中文和英文输出 |
 
@@ -124,6 +127,45 @@ git-ai config
 
 ## 🔧 高级功能
 
+### 命令行选项
+
+```bash
+# 一键提交（跳过确认，CI/CD 友好）
+git-ai -y
+git-ai --yes
+
+# 生成多条候选消息
+git-ai -n 3
+git-ai --num 3
+
+# 组合使用
+git-ai -y -n 3    # 生成 3 条，自动选择第一条提交
+```
+
+### Git Hook 集成
+
+自动集成到 `git commit` 流程，无需手动运行 `git-ai`：
+
+```bash
+# 安装 hook
+git-ai hook install
+
+# 查看状态
+git-ai hook status
+
+# 移除 hook
+git-ai hook remove
+```
+
+安装后，直接运行 `git commit`（不带 `-m`）会自动生成 commit message：
+
+```bash
+git add .
+git commit    # 自动调用 git-ai 生成消息
+```
+
+> 💡 跳过 hook: `git commit --no-verify`
+
 ### 自动忽略的文件
 
 以下文件会自动从 Diff 分析中排除，避免浪费 Token：
@@ -166,7 +208,25 @@ git-ai
 - **Local deployment**: Ollama, LM Studio - keep your data private
 - **Smart diff**: Auto-filter lock files, token optimization
 - **Interactive**: Commit / Edit / Regenerate / Cancel
+- **One-click commit**: `-y` flag for CI/CD pipelines
+- **Multiple choices**: `-n 3` to generate multiple options
+- **Git Hook**: Auto-integrate with `git commit`
 - **Conventional Commits**: Standard commit message format
+
+### CLI Options
+
+```bash
+# Auto commit (skip confirmation)
+git-ai -y
+
+# Generate multiple choices
+git-ai -n 3
+
+# Git Hook
+git-ai hook install   # Install hook
+git-ai hook remove    # Remove hook
+git-ai hook status    # Check status
+```
 
 ### Workflow
 
