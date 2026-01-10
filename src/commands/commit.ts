@@ -18,6 +18,11 @@ import type { AIConfig } from '../types.js';
 
 type ActionChoice = 'commit' | 'edit' | 'regenerate' | 'cancel';
 
+export interface CommitOptions {
+  autoCommit?: boolean;
+  numChoices?: number;
+}
+
 function exitWithError(message: string, hint?: string): never {
   console.error(chalk.red(`❌ ${message}`));
   if (hint) {
@@ -26,7 +31,9 @@ function exitWithError(message: string, hint?: string): never {
   process.exit(1);
 }
 
-export async function runCommit(): Promise<void> {
+export async function runCommit(options: CommitOptions = {}): Promise<void> {
+  const { autoCommit = false, numChoices = 1 } = options;
+
   // Environment checks
   if (!(await isGitInstalled())) {
     exitWithError('Git is not installed. Please install git first.');
@@ -71,12 +78,31 @@ export async function runCommit(): Promise<void> {
 
   // Create AI client
   const client = createAIClient(config);
+  const input: CommitMessageGenerationInput = { diff, stagedFiles, ignoredFiles, truncated };
 
-  let commitMessage = await generateWithSpinner(
-    client,
-    { diff, stagedFiles, ignoredFiles, truncated },
-    config
-  );
+  // Generate commit message(s)
+  let commitMessage: string;
+
+  if (numChoices > 1) {
+    // Generate multiple choices
+    const messages = await generateMultipleWithSpinner(client, input, config, numChoices);
+    if (autoCommit) {
+      // Auto mode: use first message
+      commitMessage = messages[0];
+    } else {
+      commitMessage = await selectFromChoices(messages);
+    }
+  } else {
+    commitMessage = await generateWithSpinner(client, input, config);
+  }
+
+  // Auto commit mode
+  if (autoCommit) {
+    console.log(chalk.green('\n✨ Generated commit message:\n'));
+    console.log(chalk.white.bold(`   ${commitMessage.split('\n').join('\n   ')}`));
+    await performCommit(commitMessage);
+    return;
+  }
 
   // Interactive loop
   while (true) {
@@ -116,16 +142,37 @@ export async function runCommit(): Promise<void> {
         continue;
       }
     } else if (action === 'regenerate') {
-      commitMessage = await generateWithSpinner(
-        client,
-        { diff, stagedFiles, ignoredFiles, truncated },
-        config
-      );
+      if (numChoices > 1) {
+        const messages = await generateMultipleWithSpinner(client, input, config, numChoices);
+        commitMessage = await selectFromChoices(messages);
+      } else {
+        commitMessage = await generateWithSpinner(client, input, config);
+      }
     } else {
       console.log(chalk.gray('\n👋 Commit cancelled.\n'));
       break;
     }
   }
+}
+
+async function selectFromChoices(messages: string[]): Promise<string> {
+  if (messages.length === 1) {
+    return messages[0];
+  }
+
+  const { selected } = await inquirer.prompt<{ selected: string }>([
+    {
+      type: 'list',
+      name: 'selected',
+      message: 'Select a commit message:',
+      choices: messages.map((msg, i) => ({
+        name: `${i + 1}. ${msg.split('\n')[0]}`,
+        value: msg,
+      })),
+    },
+  ]);
+
+  return selected;
 }
 
 async function generateWithSpinner(
@@ -144,6 +191,33 @@ async function generateWithSpinner(
     return message;
   } catch (error) {
     spinner.fail('Failed to generate commit message');
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    exitWithError(errorMessage);
+  }
+}
+
+async function generateMultipleWithSpinner(
+  client: ReturnType<typeof createAIClient>,
+  input: CommitMessageGenerationInput,
+  config: AIConfig,
+  count: number
+): Promise<string[]> {
+  const spinner = ora({
+    text: `Generating ${count} commit messages...`,
+    color: 'cyan',
+  }).start();
+
+  try {
+    const promises = Array.from({ length: count }, () =>
+      generateCommitMessage(client, input, config)
+    );
+    const messages = await Promise.all(promises);
+    // Dedupe
+    const unique = [...new Set(messages)];
+    spinner.succeed(`Generated ${unique.length} commit message(s)!`);
+    return unique;
+  } catch (error) {
+    spinner.fail('Failed to generate commit messages');
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     exitWithError(errorMessage);
   }
