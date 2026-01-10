@@ -21,33 +21,37 @@ type ActionChoice = 'commit' | 'edit' | 'regenerate' | 'cancel';
 export interface CommitOptions {
   autoCommit?: boolean;
   numChoices?: number;
+  hookMode?: boolean;
 }
 
-function exitWithError(message: string, hint?: string): never {
-  console.error(chalk.red(`❌ ${message}`));
-  if (hint) {
-    console.log(chalk.gray(`   ${hint}`));
+function exitWithError(message: string, hint?: string, silent = false): never {
+  if (!silent) {
+    console.error(chalk.red(`❌ ${message}`));
+    if (hint) {
+      console.log(chalk.gray(`   ${hint}`));
+    }
   }
   process.exit(1);
 }
 
 export async function runCommit(options: CommitOptions = {}): Promise<void> {
-  const { autoCommit = false, numChoices = 1 } = options;
+  const { autoCommit = false, numChoices = 1, hookMode = false } = options;
 
   // Environment checks
   if (!(await isGitInstalled())) {
-    exitWithError('Git is not installed. Please install git first.');
+    exitWithError('Git is not installed. Please install git first.', undefined, hookMode);
   }
 
   if (!(await isInGitRepo())) {
-    exitWithError('Not in a git repository.');
+    exitWithError('Not in a git repository.', undefined, hookMode);
   }
 
   const stagedFiles = await getStagedFiles();
   if (stagedFiles.length === 0) {
     exitWithError(
       'No staged changes found.',
-      'Use `git add <files>` to stage your changes first.'
+      'Use `git add <files>` to stage your changes first.',
+      hookMode
     );
   }
 
@@ -57,23 +61,27 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
     exitWithError('Configuration not found.', 'Run `git-ai config` to set up your AI provider.');
   }
 
-  // Show staged files
-  console.log(chalk.cyan('\n📁 Staged files:'));
-  stagedFiles.forEach((file) => {
-    console.log(chalk.gray(`   ${file}`));
-  });
+  // Show staged files (skip in hook mode)
+  if (!hookMode) {
+    console.log(chalk.cyan('\n📁 Staged files:'));
+    stagedFiles.forEach((file) => {
+      console.log(chalk.gray(`   ${file}`));
+    });
+  }
 
   // Get filtered diff
   const { diff, truncated, ignoredFiles } = await getFilteredDiff(stagedFiles);
 
-  if (ignoredFiles.length > 0) {
-    const preview = ignoredFiles.slice(0, 8).join(', ');
-    const more = ignoredFiles.length > 8 ? ` (+${ignoredFiles.length - 8} more)` : '';
-    console.log(chalk.gray(`\n🧹 Ignored from diff (token optimization): ${preview}${more}`));
-  }
+  if (!hookMode) {
+    if (ignoredFiles.length > 0) {
+      const preview = ignoredFiles.slice(0, 8).join(', ');
+      const more = ignoredFiles.length > 8 ? ` (+${ignoredFiles.length - 8} more)` : '';
+      console.log(chalk.gray(`\n🧹 Ignored from diff (token optimization): ${preview}${more}`));
+    }
 
-  if (truncated) {
-    console.log(chalk.yellow('\n⚠️  Diff was truncated due to size limits.'));
+    if (truncated) {
+      console.log(chalk.yellow('\n⚠️  Diff was truncated due to size limits.'));
+    }
   }
 
   // Create AI client
@@ -82,6 +90,17 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
 
   // Generate commit message(s)
   let commitMessage: string;
+
+  if (hookMode) {
+    // Hook mode: silent generation, output only the message
+    try {
+      commitMessage = await generateCommitMessage(client, input, config);
+      console.log(commitMessage);
+      return;
+    } catch {
+      process.exit(1);
+    }
+  }
 
   if (numChoices > 1) {
     // Generate multiple choices
