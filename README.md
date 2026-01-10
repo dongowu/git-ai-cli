@@ -140,6 +140,9 @@ git-ai --num 3
 
 # 组合使用
 git-ai -y -n 3    # 生成 3 条，自动选择第一条提交
+
+# Hook 模式（供 git hook 调用，仅输出消息）
+git-ai --hook
 ```
 
 ### Git Hook 集成
@@ -221,6 +224,9 @@ git-ai -y
 
 # Generate multiple choices
 git-ai -n 3
+
+# Hook mode (for git hooks, outputs message only)
+git-ai --hook
 
 # Git Hook
 git-ai hook install   # Install hook
