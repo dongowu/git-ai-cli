@@ -106,5 +106,5 @@ export async function runConfig(): Promise<void> {
 
   console.log(chalk.green('\n✅ Configuration saved successfully!'));
   console.log(chalk.gray(`   Config file: ${getConfigPath()}`));
-  console.log(chalk.cyan('\n💡 You can now use `git ai` to generate commit messages.\n'));
+  console.log(chalk.cyan('\n💡 You can now use `git-ai` to generate commit messages.\n'));
 }

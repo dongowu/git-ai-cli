@@ -2,8 +2,12 @@
 
 import { cac } from 'cac';
 import chalk from 'chalk';
+import { createRequire } from 'node:module';
 import { runConfig } from './commands/config.js';
 import { runCommit } from './commands/commit.js';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json') as { version?: string };
 
 const cli = cac('git-ai');
 
@@ -32,6 +36,6 @@ cli
   });
 
 cli.help();
-cli.version('1.0.0');
+cli.version(pkg.version || '0.0.0');
 
 cli.parse();

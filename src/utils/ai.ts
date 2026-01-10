@@ -36,20 +36,53 @@ export function createAIClient(config: AIConfig): OpenAI {
   });
 }
 
+export interface CommitMessageGenerationInput {
+  diff: string;
+  stagedFiles?: string[];
+  ignoredFiles?: string[];
+  truncated?: boolean;
+}
+
 export async function generateCommitMessage(
   client: OpenAI,
-  diff: string,
+  input: CommitMessageGenerationInput,
   config: AIConfig
 ): Promise<string> {
   const systemPrompt =
     config.customPrompt ||
     (config.locale === 'zh' ? DEFAULT_SYSTEM_PROMPT_ZH : DEFAULT_SYSTEM_PROMPT_EN);
 
+  const isZh = config.locale === 'zh';
+  const lines: string[] = [];
+
+  if (input.stagedFiles?.length) {
+    const header = isZh ? '已暂存文件:' : 'Staged files:';
+    lines.push(`${header}\n${input.stagedFiles.map((f) => `- ${f}`).join('\n')}`);
+  }
+
+  if (input.ignoredFiles?.length) {
+    const header = isZh
+      ? '以下文件为节省 Token 已忽略 Diff:'
+      : 'Ignored files (diff omitted for token optimization):';
+    lines.push(`${header}\n${input.ignoredFiles.map((f) => `- ${f}`).join('\n')}`);
+  }
+
+  if (input.truncated) {
+    lines.push(
+      isZh
+        ? '注意：Diff 内容已因长度限制被截断。'
+        : 'Note: The diff was truncated due to size limits.'
+    );
+  }
+
+  const diffHeader = isZh ? 'Git Diff:' : 'Git diff:';
+  lines.push(`${diffHeader}\n\n${input.diff || '(empty)'}`);
+
   const response = await client.chat.completions.create({
     model: config.model,
     messages: [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: `Here is the git diff:\n\n${diff}` },
+      { role: 'user', content: lines.join('\n\n') },
     ],
     temperature: 0.7,
     max_tokens: 500,
