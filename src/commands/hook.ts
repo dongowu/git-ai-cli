@@ -24,10 +24,18 @@ if [ -z "$COMMIT_SOURCE" ]; then
 
   # Generate commit message using git-ai
   if command -v git-ai >/dev/null 2>&1; then
-    echo "🤖 Generating commit message with git-ai..."
-    MSG=$(git-ai --yes 2>/dev/null | grep -A 100 "Generated commit message:" | tail -n +2 | head -n 1 | sed 's/^[[:space:]]*//')
-    if [ -n "$MSG" ]; then
-      echo "$MSG" > "$COMMIT_MSG_FILE"
+    # Use --hook mode for clean output
+    MSG=$(git-ai --hook 2>/dev/null)
+    if [ -n "$MSG" ] && [ "$MSG" != "null" ]; then
+      # Preserve existing comments, prepend AI message
+      if [ -f "$COMMIT_MSG_FILE" ]; then
+        COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
+        echo "$MSG" > "$COMMIT_MSG_FILE"
+        echo "" >> "$COMMIT_MSG_FILE"
+        echo "$COMMENTS" >> "$COMMIT_MSG_FILE"
+      else
+        echo "$MSG" > "$COMMIT_MSG_FILE"
+      fi
     fi
   fi
 fi

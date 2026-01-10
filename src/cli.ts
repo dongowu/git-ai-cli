@@ -16,15 +16,19 @@ cli
   .command('', 'Generate AI-powered commit message')
   .option('-y, --yes', 'Skip confirmation and commit directly')
   .option('-n, --num <count>', 'Generate multiple commit messages to choose from', { default: 1 })
-  .action(async (options: { yes?: boolean; num?: number }) => {
+  .option('--hook', 'Hook mode: output only the commit message (for git hooks)')
+  .action(async (options: { yes?: boolean; num?: number; hook?: boolean }) => {
     try {
       await runCommit({
         autoCommit: options.yes ?? false,
         numChoices: Math.min(Math.max(Number(options.num) || 1, 1), 5),
+        hookMode: options.hook ?? false,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      console.error(chalk.red(`\n❌ Error: ${message}\n`));
+      if (!options.hook) {
+        console.error(chalk.red(`\n❌ Error: ${message}\n`));
+      }
       process.exit(1);
     }
   });
