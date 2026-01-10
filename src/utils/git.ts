@@ -42,21 +42,54 @@ export function isBlacklisted(filename: string): boolean {
   });
 }
 
-export async function getFilteredDiff(): Promise<{ diff: string; truncated: boolean }> {
-  const files = await getStagedFiles();
-  const diffParts: string[] = [];
+function chunkArgsByLength(
+  args: string[],
+  options: { maxItems: number; maxChars: number }
+): string[][] {
+  const batches: string[][] = [];
+  let current: string[] = [];
+  let currentChars = 0;
 
-  for (const file of files) {
-    if (isBlacklisted(file)) {
-      diffParts.push(`[File: ${file}] (content ignored - blacklisted)`);
-      continue;
+  for (const arg of args) {
+    const argLen = arg.length + 1;
+    const shouldStartNewBatch =
+      current.length >= options.maxItems || currentChars + argLen > options.maxChars;
+
+    if (shouldStartNewBatch) {
+      if (current.length > 0) {
+        batches.push(current);
+      }
+      current = [];
+      currentChars = 0;
     }
 
+    current.push(arg);
+    currentChars += argLen;
+  }
+
+  if (current.length > 0) {
+    batches.push(current);
+  }
+
+  return batches;
+}
+
+export async function getFilteredDiff(
+  files: string[]
+): Promise<{ diff: string; truncated: boolean; ignoredFiles: string[] }> {
+  const ignoredFiles = files.filter(isBlacklisted);
+  const allowedFiles = files.filter((file) => !isBlacklisted(file));
+  const diffParts: string[] = [];
+
+  const fileBatches = chunkArgsByLength(allowedFiles, { maxItems: 50, maxChars: 6000 });
+  for (const batch of fileBatches) {
     try {
-      const { stdout } = await execa('git', ['diff', '--cached', '--', file]);
-      diffParts.push(stdout);
+      const { stdout } = await execa('git', ['diff', '--cached', '--', ...batch]);
+      if (stdout) {
+        diffParts.push(stdout);
+      }
     } catch {
-      diffParts.push(`[File: ${file}] (unable to get diff)`);
+      diffParts.push(`[Diff unavailable for ${batch.length} file(s)]`);
     }
   }
 
@@ -68,7 +101,7 @@ export async function getFilteredDiff(): Promise<{ diff: string; truncated: bool
     truncated = true;
   }
 
-  return { diff: fullDiff, truncated };
+  return { diff: fullDiff, truncated, ignoredFiles };
 }
 
 export async function commit(message: string): Promise<void> {

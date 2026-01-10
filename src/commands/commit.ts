@@ -9,35 +9,45 @@ import {
   getFilteredDiff,
   commit,
 } from '../utils/git.js';
-import { createAIClient, generateCommitMessage } from '../utils/ai.js';
+import {
+  createAIClient,
+  generateCommitMessage,
+  type CommitMessageGenerationInput,
+} from '../utils/ai.js';
+import type { AIConfig } from '../types.js';
 
 type ActionChoice = 'commit' | 'edit' | 'regenerate' | 'cancel';
+
+function exitWithError(message: string, hint?: string): never {
+  console.error(chalk.red(`❌ ${message}`));
+  if (hint) {
+    console.log(chalk.gray(`   ${hint}`));
+  }
+  process.exit(1);
+}
 
 export async function runCommit(): Promise<void> {
   // Environment checks
   if (!(await isGitInstalled())) {
-    console.error(chalk.red('❌ Git is not installed. Please install git first.'));
-    process.exit(1);
+    exitWithError('Git is not installed. Please install git first.');
   }
 
   if (!(await isInGitRepo())) {
-    console.error(chalk.red('❌ Not in a git repository.'));
-    process.exit(1);
+    exitWithError('Not in a git repository.');
   }
 
   const stagedFiles = await getStagedFiles();
   if (stagedFiles.length === 0) {
-    console.error(chalk.red('❌ No staged changes found.'));
-    console.log(chalk.gray('   Use `git add <files>` to stage your changes first.'));
-    process.exit(1);
+    exitWithError(
+      'No staged changes found.',
+      'Use `git add <files>` to stage your changes first.'
+    );
   }
 
   // Check config
   const config = getConfig();
   if (!config) {
-    console.error(chalk.red('❌ Configuration not found.'));
-    console.log(chalk.gray('   Run `git ai config` to set up your AI provider.'));
-    process.exit(1);
+    exitWithError('Configuration not found.', 'Run `git-ai config` to set up your AI provider.');
   }
 
   // Show staged files
@@ -47,7 +57,13 @@ export async function runCommit(): Promise<void> {
   });
 
   // Get filtered diff
-  const { diff, truncated } = await getFilteredDiff();
+  const { diff, truncated, ignoredFiles } = await getFilteredDiff(stagedFiles);
+
+  if (ignoredFiles.length > 0) {
+    const preview = ignoredFiles.slice(0, 8).join(', ');
+    const more = ignoredFiles.length > 8 ? ` (+${ignoredFiles.length - 8} more)` : '';
+    console.log(chalk.gray(`\n🧹 Ignored from diff (token optimization): ${preview}${more}`));
+  }
 
   if (truncated) {
     console.log(chalk.yellow('\n⚠️  Diff was truncated due to size limits.'));
@@ -56,7 +72,11 @@ export async function runCommit(): Promise<void> {
   // Create AI client
   const client = createAIClient(config);
 
-  let commitMessage = await generateWithSpinner(client, diff, config);
+  let commitMessage = await generateWithSpinner(
+    client,
+    { diff, stagedFiles, ignoredFiles, truncated },
+    config
+  );
 
   // Interactive loop
   while (true) {
@@ -96,7 +116,11 @@ export async function runCommit(): Promise<void> {
         continue;
       }
     } else if (action === 'regenerate') {
-      commitMessage = await generateWithSpinner(client, diff, config);
+      commitMessage = await generateWithSpinner(
+        client,
+        { diff, stagedFiles, ignoredFiles, truncated },
+        config
+      );
     } else {
       console.log(chalk.gray('\n👋 Commit cancelled.\n'));
       break;
@@ -106,8 +130,8 @@ export async function runCommit(): Promise<void> {
 
 async function generateWithSpinner(
   client: ReturnType<typeof createAIClient>,
-  diff: string,
-  config: ReturnType<typeof getConfig> & object
+  input: CommitMessageGenerationInput,
+  config: AIConfig
 ): Promise<string> {
   const spinner = ora({
     text: 'Generating commit message...',
@@ -115,14 +139,13 @@ async function generateWithSpinner(
   }).start();
 
   try {
-    const message = await generateCommitMessage(client, diff, config);
+    const message = await generateCommitMessage(client, input, config);
     spinner.succeed('Commit message generated!');
     return message;
   } catch (error) {
     spinner.fail('Failed to generate commit message');
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error(chalk.red(`\n❌ Error: ${errorMessage}`));
-    process.exit(1);
+    exitWithError(errorMessage);
   }
 }
 
@@ -139,7 +162,6 @@ async function performCommit(message: string): Promise<void> {
   } catch (error) {
     spinner.fail('Failed to create commit');
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error(chalk.red(`\n❌ Error: ${errorMessage}`));
-    process.exit(1);
+    exitWithError(errorMessage);
   }
 }
