@@ -37,6 +37,15 @@ function exitWithError(message: string, hint?: string, silent = false): never {
 export async function runCommit(options: CommitOptions = {}): Promise<void> {
   const { autoCommit = false, numChoices = 1, hookMode = false } = options;
 
+  // Recursion guard - prevent hook from triggering another git-ai
+  if (process.env.GIT_AI_RUNNING === '1') {
+    if (!hookMode) {
+      console.log(chalk.yellow('⚠️  git-ai is already running (recursion prevented)'));
+    }
+    process.exit(0);
+  }
+  process.env.GIT_AI_RUNNING = '1';
+
   // Environment checks
   if (!(await isGitInstalled())) {
     exitWithError('Git is not installed. Please install git first.', undefined, hookMode);
