@@ -127,6 +127,16 @@ git-ai config
 
 ## 🔧 高级功能
 
+### 命令结构
+
+```bash
+git-ai              # 交互式生成并提交（默认）
+git-ai commit       # 同上，显式提交命令
+git-ai msg          # 仅生成消息，输出到 stdout（供脚本/Hook 使用）
+git-ai config       # 配置 AI 服务商
+git-ai hook         # 管理 Git Hook
+```
+
 ### 命令行选项
 
 ```bash
@@ -140,9 +150,37 @@ git-ai --num 3
 
 # 组合使用
 git-ai -y -n 3    # 生成 3 条，自动选择第一条提交
+```
 
-# Hook 模式（供 git hook 调用，仅输出消息）
-git-ai --hook
+### `git-ai msg` - 脚本友好模式
+
+专为 Hook 和脚本设计，仅输出 commit message：
+
+```bash
+# 纯文本输出
+git-ai msg
+
+# JSON 格式输出（含元数据）
+git-ai msg --json
+
+# 静默模式（无 spinner）
+git-ai msg --quiet
+
+# 生成多条
+git-ai msg -n 3
+```
+
+JSON 输出示例：
+```json
+{
+  "success": true,
+  "message": "feat(auth): add OAuth2 login support",
+  "metadata": {
+    "stagedFiles": ["src/auth.ts", "src/login.ts"],
+    "truncated": false,
+    "ignoredFiles": ["package-lock.json"]
+  }
+}
 ```
 
 ### Git Hook 集成
@@ -160,11 +198,16 @@ git-ai hook status
 git-ai hook remove
 ```
 
+**Hook 特性：**
+- **链式执行**：如果已有 `prepare-commit-msg` hook，git-ai 会作为 wrapper 执行，原 hook 仍会运行
+- **递归保护**：通过环境变量防止 hook 递归调用
+- **智能跳过**：使用 `-m` 参数或 merge/amend 时自动跳过
+
 安装后，直接运行 `git commit`（不带 `-m`）会自动生成 commit message：
 
 ```bash
 git add .
-git commit    # 自动调用 git-ai 生成消息
+git commit    # 自动调用 git-ai msg 生成消息
 ```
 
 > 💡 跳过 hook: `git commit --no-verify`
@@ -216,6 +259,16 @@ git-ai
 - **Git Hook**: Auto-integrate with `git commit`
 - **Conventional Commits**: Standard commit message format
 
+### Commands
+
+```bash
+git-ai              # Interactive commit (default)
+git-ai commit       # Same as above, explicit command
+git-ai msg          # Generate message only (stdout, for scripts/hooks)
+git-ai config       # Configure AI provider
+git-ai hook         # Manage Git hooks
+```
+
 ### CLI Options
 
 ```bash
@@ -225,14 +278,22 @@ git-ai -y
 # Generate multiple choices
 git-ai -n 3
 
-# Hook mode (for git hooks, outputs message only)
-git-ai --hook
+# Script-friendly message generation
+git-ai msg              # Plain text output
+git-ai msg --json       # JSON output with metadata
+git-ai msg --quiet      # No spinner
 
-# Git Hook
-git-ai hook install   # Install hook
+# Git Hook management
+git-ai hook install   # Install hook (chains with existing hooks)
 git-ai hook remove    # Remove hook
 git-ai hook status    # Check status
 ```
+
+### Git Hook Features
+
+- **Hook chaining**: Works alongside existing `prepare-commit-msg` hooks
+- **Recursion protection**: Prevents infinite loops via environment variable
+- **Smart skip**: Skips when using `-m`, merge, or amend
 
 ### Workflow
 

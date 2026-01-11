@@ -4,41 +4,118 @@ import { existsSync, readFileSync, writeFileSync, unlinkSync, chmodSync } from '
 import { join } from 'node:path';
 
 const HOOK_NAME = 'prepare-commit-msg';
+const HOOK_MARKER = '# git-ai-hook-start';
+const HOOK_END_MARKER = '# git-ai-hook-end';
 
+// Hook script with all protections
 const HOOK_SCRIPT = `#!/bin/sh
+${HOOK_MARKER}
 # git-ai hook - auto-generate commit message
-# To disable temporarily: git commit --no-verify
+# To disable: git commit --no-verify
 
-COMMIT_MSG_FILE=$1
-COMMIT_SOURCE=$2
+COMMIT_MSG_FILE="$1"
+COMMIT_SOURCE="$2"
 
-# Only run for regular commits (not merge, squash, etc.)
-if [ -z "$COMMIT_SOURCE" ]; then
-  # Check if there's already a message (e.g., from -m flag)
-  if [ -s "$COMMIT_MSG_FILE" ]; then
-    EXISTING_MSG=$(cat "$COMMIT_MSG_FILE" | grep -v "^#" | tr -d '[:space:]')
-    if [ -n "$EXISTING_MSG" ]; then
-      exit 0
-    fi
+# Recursion guard
+if [ "$GIT_AI_RUNNING" = "1" ]; then
+  exit 0
+fi
+export GIT_AI_RUNNING=1
+
+# Only run for regular commits (not merge, squash, amend, etc.)
+if [ -n "$COMMIT_SOURCE" ]; then
+  exit 0
+fi
+
+# Check if there's already a non-comment message
+if [ -s "$COMMIT_MSG_FILE" ]; then
+  EXISTING_MSG=$(grep -v "^#" "$COMMIT_MSG_FILE" | grep -v "^$" | head -1)
+  if [ -n "$EXISTING_MSG" ]; then
+    exit 0
   fi
+fi
 
-  # Generate commit message using git-ai
-  if command -v git-ai >/dev/null 2>&1; then
-    # Use --hook mode for clean output
-    MSG=$(git-ai --hook 2>/dev/null)
-    if [ -n "$MSG" ] && [ "$MSG" != "null" ]; then
-      # Preserve existing comments, prepend AI message
-      if [ -f "$COMMIT_MSG_FILE" ]; then
-        COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
-        echo "$MSG" > "$COMMIT_MSG_FILE"
-        echo "" >> "$COMMIT_MSG_FILE"
-        echo "$COMMENTS" >> "$COMMIT_MSG_FILE"
-      else
-        echo "$MSG" > "$COMMIT_MSG_FILE"
-      fi
+# Generate commit message using git-ai msg
+if command -v git-ai >/dev/null 2>&1; then
+  MSG=$(git-ai msg --quiet 2>/dev/null)
+  EXIT_CODE=$?
+
+  if [ $EXIT_CODE -eq 0 ] && [ -n "$MSG" ]; then
+    # Preserve existing comments, prepend AI message
+    if [ -f "$COMMIT_MSG_FILE" ]; then
+      COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
+      printf '%s\\n\\n%s\\n' "$MSG" "$COMMENTS" > "$COMMIT_MSG_FILE"
+    else
+      printf '%s\\n' "$MSG" > "$COMMIT_MSG_FILE"
     fi
   fi
 fi
+${HOOK_END_MARKER}
+
+`;
+
+// Wrapper template for chaining with existing hook
+const WRAPPER_TEMPLATE = `#!/bin/sh
+${HOOK_MARKER}
+# git-ai hook wrapper - chains with existing hook
+# To disable: git commit --no-verify
+
+COMMIT_MSG_FILE="$1"
+COMMIT_SOURCE="$2"
+SHA1="$3"
+
+# Recursion guard
+if [ "$GIT_AI_RUNNING" = "1" ]; then
+  # Still call original hook if exists
+  if [ -x "__ORIGINAL_HOOK__" ]; then
+    "__ORIGINAL_HOOK__" "$COMMIT_MSG_FILE" "$COMMIT_SOURCE" "$SHA1"
+  fi
+  exit $?
+fi
+export GIT_AI_RUNNING=1
+
+# Only run for regular commits
+if [ -n "$COMMIT_SOURCE" ]; then
+  # Still call original hook
+  if [ -x "__ORIGINAL_HOOK__" ]; then
+    "__ORIGINAL_HOOK__" "$COMMIT_MSG_FILE" "$COMMIT_SOURCE" "$SHA1"
+  fi
+  exit $?
+fi
+
+# Check if there's already a non-comment message
+if [ -s "$COMMIT_MSG_FILE" ]; then
+  EXISTING_MSG=$(grep -v "^#" "$COMMIT_MSG_FILE" | grep -v "^$" | head -1)
+  if [ -n "$EXISTING_MSG" ]; then
+    # Still call original hook
+    if [ -x "__ORIGINAL_HOOK__" ]; then
+      "__ORIGINAL_HOOK__" "$COMMIT_MSG_FILE" "$COMMIT_SOURCE" "$SHA1"
+    fi
+    exit $?
+  fi
+fi
+
+# Generate commit message using git-ai msg
+if command -v git-ai >/dev/null 2>&1; then
+  MSG=$(git-ai msg --quiet 2>/dev/null)
+  EXIT_CODE=$?
+
+  if [ $EXIT_CODE -eq 0 ] && [ -n "$MSG" ]; then
+    if [ -f "$COMMIT_MSG_FILE" ]; then
+      COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
+      printf '%s\\n\\n%s\\n' "$MSG" "$COMMENTS" > "$COMMIT_MSG_FILE"
+    else
+      printf '%s\\n' "$MSG" > "$COMMIT_MSG_FILE"
+    fi
+  fi
+fi
+
+# Call original hook
+if [ -x "__ORIGINAL_HOOK__" ]; then
+  "__ORIGINAL_HOOK__" "$COMMIT_MSG_FILE" "$COMMIT_SOURCE" "$SHA1"
+  exit $?
+fi
+${HOOK_END_MARKER}
 
 exit 0
 `;
@@ -62,6 +139,36 @@ async function isInGitRepo(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function isGitAiHook(content: string): boolean {
+  return content.includes(HOOK_MARKER) || content.includes('git-ai');
+}
+
+function hasOtherHookContent(content: string): boolean {
+  // Remove git-ai hook section and check if there's other content
+  const lines = content.split('\n');
+  let inGitAiSection = false;
+  const otherLines: string[] = [];
+
+  for (const line of lines) {
+    if (line.includes(HOOK_MARKER)) {
+      inGitAiSection = true;
+      continue;
+    }
+    if (line.includes(HOOK_END_MARKER)) {
+      inGitAiSection = false;
+      continue;
+    }
+    if (!inGitAiSection) {
+      // Skip shebang and empty lines
+      if (!line.startsWith('#!') && line.trim() !== '') {
+        otherLines.push(line);
+      }
+    }
+  }
+
+  return otherLines.some(line => !line.startsWith('#') && line.trim() !== '');
 }
 
 export async function runHook(action: string): Promise<void> {
@@ -91,12 +198,21 @@ export async function runHook(action: string): Promise<void> {
 async function showStatus(hookFile: string): Promise<void> {
   if (existsSync(hookFile)) {
     const content = readFileSync(hookFile, 'utf-8');
-    if (content.includes('git-ai')) {
+    if (isGitAiHook(content)) {
       console.log(chalk.green('✅ git-ai hook is installed'));
       console.log(chalk.gray(`   Location: ${hookFile}`));
+
+      // Check if it's a wrapper
+      const originalHook = `${hookFile}.original`;
+      if (existsSync(originalHook)) {
+        console.log(chalk.cyan('   Mode: Wrapper (chained with original hook)'));
+      } else {
+        console.log(chalk.cyan('   Mode: Standalone'));
+      }
     } else {
       console.log(chalk.yellow('⚠️  A prepare-commit-msg hook exists but is not from git-ai'));
       console.log(chalk.gray(`   Location: ${hookFile}`));
+      console.log(chalk.gray('   Run `git-ai hook install` to add git-ai (will chain with existing hook)'));
     }
   } else {
     console.log(chalk.gray('❌ git-ai hook is not installed'));
@@ -104,30 +220,57 @@ async function showStatus(hookFile: string): Promise<void> {
 }
 
 async function installHook(hookFile: string, hooksPath: string): Promise<void> {
-  // Check if hook already exists
-  if (existsSync(hookFile)) {
-    const content = readFileSync(hookFile, 'utf-8');
-    if (content.includes('git-ai')) {
-      console.log(chalk.yellow('⚠️  git-ai hook is already installed'));
-      return;
-    }
-
-    // Backup existing hook
-    const backupFile = `${hookFile}.backup`;
-    writeFileSync(backupFile, content);
-    console.log(chalk.gray(`   Existing hook backed up to: ${backupFile}`));
-  }
-
   // Ensure hooks directory exists
   if (!existsSync(hooksPath)) {
     await execa('mkdir', ['-p', hooksPath]);
   }
 
-  // Write hook script
-  writeFileSync(hookFile, HOOK_SCRIPT);
-  chmodSync(hookFile, 0o755);
+  // Check if hook already exists
+  if (existsSync(hookFile)) {
+    const content = readFileSync(hookFile, 'utf-8');
 
-  console.log(chalk.green('✅ git-ai hook installed successfully!'));
+    if (isGitAiHook(content)) {
+      // Already has git-ai, update it
+      console.log(chalk.yellow('⚠️  git-ai hook already installed, updating...'));
+
+      // Check if there's an original hook
+      const originalHook = `${hookFile}.original`;
+      if (existsSync(originalHook)) {
+        // Re-create wrapper with updated script
+        const wrapper = WRAPPER_TEMPLATE.replace(/__ORIGINAL_HOOK__/g, originalHook);
+        writeFileSync(hookFile, wrapper);
+        chmodSync(hookFile, 0o755);
+        console.log(chalk.green('✅ git-ai hook updated (wrapper mode)'));
+      } else {
+        writeFileSync(hookFile, HOOK_SCRIPT);
+        chmodSync(hookFile, 0o755);
+        console.log(chalk.green('✅ git-ai hook updated'));
+      }
+      return;
+    }
+
+    // Existing non-git-ai hook - use wrapper mode
+    const originalHook = `${hookFile}.original`;
+
+    // Backup original
+    writeFileSync(originalHook, content);
+    chmodSync(originalHook, 0o755);
+    console.log(chalk.gray(`   Original hook saved to: ${originalHook}`));
+
+    // Install wrapper
+    const wrapper = WRAPPER_TEMPLATE.replace(/__ORIGINAL_HOOK__/g, originalHook);
+    writeFileSync(hookFile, wrapper);
+    chmodSync(hookFile, 0o755);
+
+    console.log(chalk.green('✅ git-ai hook installed (wrapper mode)'));
+    console.log(chalk.cyan('   Your original hook will still be executed after git-ai'));
+  } else {
+    // No existing hook - install standalone
+    writeFileSync(hookFile, HOOK_SCRIPT);
+    chmodSync(hookFile, 0o755);
+    console.log(chalk.green('✅ git-ai hook installed'));
+  }
+
   console.log(chalk.gray(`   Location: ${hookFile}`));
   console.log('');
   console.log(chalk.cyan('📝 How it works:'));
@@ -146,22 +289,25 @@ async function removeHook(hookFile: string): Promise<void> {
   }
 
   const content = readFileSync(hookFile, 'utf-8');
-  if (!content.includes('git-ai')) {
+  if (!isGitAiHook(content)) {
     console.log(chalk.yellow('⚠️  The existing hook is not from git-ai, skipping removal'));
     return;
   }
 
-  unlinkSync(hookFile);
+  // Check for original hook
+  const originalHook = `${hookFile}.original`;
 
-  // Restore backup if exists
-  const backupFile = `${hookFile}.backup`;
-  if (existsSync(backupFile)) {
-    const backupContent = readFileSync(backupFile, 'utf-8');
-    writeFileSync(hookFile, backupContent);
+  if (existsSync(originalHook)) {
+    // Restore original hook
+    const originalContent = readFileSync(originalHook, 'utf-8');
+    writeFileSync(hookFile, originalContent);
     chmodSync(hookFile, 0o755);
-    unlinkSync(backupFile);
-    console.log(chalk.gray('   Previous hook restored from backup'));
+    unlinkSync(originalHook);
+    console.log(chalk.green('✅ git-ai hook removed'));
+    console.log(chalk.gray('   Original hook restored'));
+  } else {
+    // Just remove the hook
+    unlinkSync(hookFile);
+    console.log(chalk.green('✅ git-ai hook removed'));
   }
-
-  console.log(chalk.green('✅ git-ai hook removed successfully!'));
 }
