@@ -33,6 +33,8 @@ export function createAIClient(config: AIConfig): OpenAI {
   return new OpenAI({
     apiKey: config.apiKey || 'ollama',
     baseURL: config.baseUrl,
+    timeout: 30000, // 30 second timeout
+    maxRetries: 2,  // Built-in retry support
   });
 }
 
