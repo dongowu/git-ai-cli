@@ -44,17 +44,6 @@ function exitWithError(message: string, options: MsgOptions): never {
 export async function runMsg(options: MsgOptions = {}): Promise<void> {
   const { json = false, quiet = false, num = 1 } = options;
 
-  // Check for recursion guard
-  if (process.env.GIT_AI_RUNNING === '1') {
-    if (json) {
-      console.log(JSON.stringify({ success: false, error: 'Recursion detected' }));
-    }
-    process.exit(0);
-  }
-
-  // Set recursion guard
-  process.env.GIT_AI_RUNNING = '1';
-
   // Environment checks
   if (!(await isGitInstalled())) {
     exitWithError('Git is not installed.', options);
@@ -113,8 +102,14 @@ export async function runMsg(options: MsgOptions = {}): Promise<void> {
         };
         console.log(JSON.stringify(result, null, 2));
       } else {
-        // Plain output: one message per line
-        unique.forEach((msg) => console.log(msg));
+        // Plain output: use delimiter for multi-line message safety
+        // Each message separated by ---END---
+        unique.forEach((msg, i) => {
+          console.log(msg);
+          if (i < unique.length - 1) {
+            console.log('---END---');
+          }
+        });
       }
     } else {
       // Single message

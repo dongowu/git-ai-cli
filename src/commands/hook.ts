@@ -11,16 +11,21 @@ const HOOK_END_MARKER = '# git-ai-hook-end';
 const HOOK_SCRIPT = `#!/bin/sh
 ${HOOK_MARKER}
 # git-ai hook - auto-generate commit message
-# To disable: git commit --no-verify
+# To disable: GIT_AI_DISABLED=1 git commit
 
 COMMIT_MSG_FILE="$1"
 COMMIT_SOURCE="$2"
 
-# Recursion guard
+# Skip if disabled
+if [ "$GIT_AI_DISABLED" = "1" ]; then
+  exit 0
+fi
+
+# Recursion guard - skip if git-ai is already running
+# (e.g., when git-ai commit calls git commit internally)
 if [ "$GIT_AI_RUNNING" = "1" ]; then
   exit 0
 fi
-export GIT_AI_RUNNING=1
 
 # Only run for regular commits (not merge, squash, amend, etc.)
 if [ -n "$COMMIT_SOURCE" ]; then
@@ -58,25 +63,30 @@ ${HOOK_END_MARKER}
 const WRAPPER_TEMPLATE = `#!/bin/sh
 ${HOOK_MARKER}
 # git-ai hook wrapper - chains with existing hook
-# To disable: git commit --no-verify
+# To disable: GIT_AI_DISABLED=1 git commit
 
 COMMIT_MSG_FILE="$1"
 COMMIT_SOURCE="$2"
 SHA1="$3"
 
-# Recursion guard
-if [ "$GIT_AI_RUNNING" = "1" ]; then
-  # Still call original hook if exists
+# Skip if disabled
+if [ "$GIT_AI_DISABLED" = "1" ]; then
   if [ -x "__ORIGINAL_HOOK__" ]; then
     "__ORIGINAL_HOOK__" "$COMMIT_MSG_FILE" "$COMMIT_SOURCE" "$SHA1"
   fi
   exit $?
 fi
-export GIT_AI_RUNNING=1
+
+# Recursion guard - skip if git-ai is already running
+if [ "$GIT_AI_RUNNING" = "1" ]; then
+  if [ -x "__ORIGINAL_HOOK__" ]; then
+    "__ORIGINAL_HOOK__" "$COMMIT_MSG_FILE" "$COMMIT_SOURCE" "$SHA1"
+  fi
+  exit $?
+fi
 
 # Only run for regular commits
 if [ -n "$COMMIT_SOURCE" ]; then
-  # Still call original hook
   if [ -x "__ORIGINAL_HOOK__" ]; then
     "__ORIGINAL_HOOK__" "$COMMIT_MSG_FILE" "$COMMIT_SOURCE" "$SHA1"
   fi
@@ -87,7 +97,6 @@ fi
 if [ -s "$COMMIT_MSG_FILE" ]; then
   EXISTING_MSG=$(grep -v "^#" "$COMMIT_MSG_FILE" | grep -v "^$" | head -1)
   if [ -n "$EXISTING_MSG" ]; then
-    # Still call original hook
     if [ -x "__ORIGINAL_HOOK__" ]; then
       "__ORIGINAL_HOOK__" "$COMMIT_MSG_FILE" "$COMMIT_SOURCE" "$SHA1"
     fi
@@ -142,33 +151,8 @@ async function isInGitRepo(): Promise<boolean> {
 }
 
 function isGitAiHook(content: string): boolean {
-  return content.includes(HOOK_MARKER) || content.includes('git-ai');
-}
-
-function hasOtherHookContent(content: string): boolean {
-  // Remove git-ai hook section and check if there's other content
-  const lines = content.split('\n');
-  let inGitAiSection = false;
-  const otherLines: string[] = [];
-
-  for (const line of lines) {
-    if (line.includes(HOOK_MARKER)) {
-      inGitAiSection = true;
-      continue;
-    }
-    if (line.includes(HOOK_END_MARKER)) {
-      inGitAiSection = false;
-      continue;
-    }
-    if (!inGitAiSection) {
-      // Skip shebang and empty lines
-      if (!line.startsWith('#!') && line.trim() !== '') {
-        otherLines.push(line);
-      }
-    }
-  }
-
-  return otherLines.some(line => !line.startsWith('#') && line.trim() !== '');
+  // Only match our specific marker to avoid false positives
+  return content.includes(HOOK_MARKER);
 }
 
 export async function runHook(action: string): Promise<void> {

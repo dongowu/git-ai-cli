@@ -200,7 +200,7 @@ git-ai hook remove
 
 **Hook 特性：**
 - **链式执行**：如果已有 `prepare-commit-msg` hook，git-ai 会作为 wrapper 执行，原 hook 仍会运行
-- **递归保护**：通过环境变量防止 hook 递归调用
+- **递归保护**：通过 `GIT_AI_RUNNING` 环境变量防止 hook 递归调用
 - **智能跳过**：使用 `-m` 参数或 merge/amend 时自动跳过
 
 安装后，直接运行 `git commit`（不带 `-m`）会自动生成 commit message：
@@ -210,7 +210,8 @@ git add .
 git commit    # 自动调用 git-ai msg 生成消息
 ```
 
-> 💡 跳过 hook: `git commit --no-verify`
+> 💡 临时跳过: `GIT_AI_DISABLED=1 git commit`
+> ⚠️ 注意: `--no-verify` 不会跳过 prepare-commit-msg hook
 
 ### 自动忽略的文件
 
@@ -292,8 +293,9 @@ git-ai hook status    # Check status
 ### Git Hook Features
 
 - **Hook chaining**: Works alongside existing `prepare-commit-msg` hooks
-- **Recursion protection**: Prevents infinite loops via environment variable
+- **Recursion protection**: Prevents infinite loops via `GIT_AI_RUNNING` env var
 - **Smart skip**: Skips when using `-m`, merge, or amend
+- **Manual skip**: `GIT_AI_DISABLED=1 git commit` (note: `--no-verify` does NOT skip prepare-commit-msg)
 
 ### Workflow
 
