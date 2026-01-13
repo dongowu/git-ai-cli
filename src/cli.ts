@@ -95,9 +95,10 @@ cli
 
 cli
   .command('hook <action>', 'Manage Git hooks (install/remove/status)')
-  .action(async (action: string) => {
+  .option('-g, --global', 'Apply to global Git hooks (all repositories)')
+  .action(async (action: string, options: { global?: boolean }) => {
     try {
-      await runHook(action);
+      await runHook(action, { global: options.global });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       console.error(chalk.red(`\n❌ Error: ${message}\n`));
