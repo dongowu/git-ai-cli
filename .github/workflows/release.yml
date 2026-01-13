@@ -30,7 +30,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      # 保留您原有的 Release Note 生成逻辑
       - name: Generate Release Notes
         run: |
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
@@ -46,12 +45,9 @@ jobs:
 
           echo "" >> release_notes.md
           echo "### Install" >> release_notes.md
-          echo "\
-```bash\
-" >> release_notes.md
+          echo '```bash' >> release_notes.md
           echo "npm install -g @dongowu/git-ai-cli" >> release_notes.md
-          echo "\
-```\n" >> release_notes.md
+          echo '```' >> release_notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
