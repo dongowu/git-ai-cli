@@ -6,10 +6,11 @@ on:
       - 'v*'
 
 jobs:
-  release:
+  build-and-release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
 
     steps:
       - name: Checkout
@@ -17,6 +18,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # 保留您原有的 Release Note 生成逻辑
       - name: Generate Release Notes
         run: |
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
@@ -31,13 +45,22 @@ jobs:
           fi
 
           echo "" >> release_notes.md
-          echo "" >> release_notes.md
           echo "### Install" >> release_notes.md
-          echo "\`\`\`bash" >> release_notes.md
+          echo "\
+```bash\
+" >> release_notes.md
           echo "npm install -g @dongowu/git-ai-cli" >> release_notes.md
-          echo "\`\`\`" >> release_notes.md
+          echo "\
+```\n" >> release_notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           body_path: release_notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to NPM
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

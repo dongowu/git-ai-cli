@@ -8,6 +8,7 @@ import {
   getStagedFiles,
   getFilteredDiff,
   commit,
+  getBranchName,
 } from '../utils/git.js';
 import {
   createAIClient,
@@ -80,6 +81,7 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
 
   // Get filtered diff
   const { diff, truncated, ignoredFiles } = await getFilteredDiff(stagedFiles);
+  const branchName = await getBranchName();
 
   if (!hookMode) {
     if (ignoredFiles.length > 0) {
@@ -95,7 +97,7 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
 
   // Create AI client
   const client = createAIClient(config);
-  const input: CommitMessageGenerationInput = { diff, stagedFiles, ignoredFiles, truncated };
+  const input: CommitMessageGenerationInput = { diff, stagedFiles, ignoredFiles, truncated, branchName };
 
   // Generate commit message(s)
   let commitMessage: string;

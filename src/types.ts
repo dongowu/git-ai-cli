@@ -5,6 +5,7 @@ export interface AIConfig {
   model: string;
   locale: 'zh' | 'en';
   customPrompt?: string;
+  enableFooter?: boolean;
 }
 
 export interface ProviderPreset {

@@ -19,6 +19,15 @@ export async function isInGitRepo(): Promise<boolean> {
   }
 }
 
+export async function getBranchName(): Promise<string> {
+  try {
+    const { stdout } = await execa('git', ['symbolic-ref', '--short', 'HEAD']);
+    return stdout.trim();
+  } catch {
+    return '';
+  }
+}
+
 export async function getStagedDiff(): Promise<string> {
   const { stdout } = await execa('git', ['diff', '--cached']);
   return stdout;
@@ -106,4 +115,35 @@ export async function getFilteredDiff(
 
 export async function commit(message: string): Promise<void> {
   await execa('git', ['commit', '-m', message]);
+}
+
+export async function getUserName(): Promise<string> {
+  try {
+    const { stdout } = await execa('git', ['config', 'user.name']);
+    return stdout.trim();
+  } catch {
+    return '';
+  }
+}
+
+export async function getRecentCommits(days: number): Promise<string[]> {
+  try {
+    const author = await getUserName();
+    const args = [
+      'log',
+      `--since=${days} days ago`,
+      '--pretty=format:%h %cd %s', // Hash Date Subject
+      '--date=short',
+      '--no-merges', // Exclude merge commits
+    ];
+
+    if (author) {
+      args.push(`--author=${author}`);
+    }
+
+    const { stdout } = await execa('git', args);
+    return stdout.split('\n').filter((line) => line.trim());
+  } catch {
+    return [];
+  }
 }
