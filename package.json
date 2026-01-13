@@ -12,9 +12,9 @@
     "dev": "tsc --watch",
     "start": "node dist/cli.js",
     "prepublishOnly": "npm run build",
-    "release": "npm version patch && git push && git push --tags && npm publish --access=public",
-    "release:minor": "npm version minor && git push && git push --tags && npm publish --access=public",
-    "release:major": "npm version major && git push && git push --tags && npm publish --access=public",
+    "release": "npm version patch && git push && git push --tags",
+    "release:minor": "npm version minor && git push && git push --tags",
+    "release:major": "npm version major && git push && git push --tags",
     "tag": "npm version patch && git push && git push --tags",
     "tag:minor": "npm version minor && git push && git push --tags",
     "tag:major": "npm version major && git push && git push --tags"

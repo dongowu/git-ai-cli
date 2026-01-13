@@ -6,6 +6,7 @@ import {
   isInGitRepo,
   getStagedFiles,
   getFilteredDiff,
+  getBranchName,
 } from '../utils/git.js';
 import {
   createAIClient,
@@ -66,10 +67,11 @@ export async function runMsg(options: MsgOptions = {}): Promise<void> {
 
   // Get filtered diff
   const { diff, truncated, ignoredFiles } = await getFilteredDiff(stagedFiles);
+  const branchName = await getBranchName();
 
   // Create AI client
   const client = createAIClient(config);
-  const input: CommitMessageGenerationInput = { diff, stagedFiles, ignoredFiles, truncated };
+  const input: CommitMessageGenerationInput = { diff, stagedFiles, ignoredFiles, truncated, branchName };
 
   // Generate message(s)
   try {
