@@ -1,9 +1,11 @@
 import chalk from 'chalk';
 import { execa } from 'execa';
-import { existsSync, readFileSync, writeFileSync, unlinkSync, chmodSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, unlinkSync, chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 
 const HOOK_NAME = 'prepare-commit-msg';
+const GLOBAL_HOOKS_DIR = '.git-ai-hooks';
 const HOOK_MARKER = '# git-ai-hook-start';
 const HOOK_END_MARKER = '# git-ai-hook-end';
 
@@ -129,6 +131,10 @@ ${HOOK_END_MARKER}
 exit 0
 `;
 
+function getGlobalHooksPath(): string {
+  return join(homedir(), GLOBAL_HOOKS_DIR);
+}
+
 async function getGitHooksPath(): Promise<string> {
   try {
     // Check if custom hooks path is configured
@@ -138,6 +144,15 @@ async function getGitHooksPath(): Promise<string> {
     // Default to .git/hooks
     const { stdout } = await execa('git', ['rev-parse', '--git-dir']);
     return join(stdout.trim(), 'hooks');
+  }
+}
+
+async function getGlobalCoreHooksPath(): Promise<string | null> {
+  try {
+    const { stdout } = await execa('git', ['config', '--global', '--get', 'core.hooksPath']);
+    return stdout.trim();
+  } catch {
+    return null;
   }
 }
 
@@ -155,27 +170,49 @@ function isGitAiHook(content: string): boolean {
   return content.includes(HOOK_MARKER);
 }
 
-export async function runHook(action: string): Promise<void> {
+export interface HookOptions {
+  global?: boolean;
+}
+
+export async function runHook(action: string, options: HookOptions = {}): Promise<void> {
   if (!['install', 'remove', 'status'].includes(action)) {
     console.error(chalk.red(`❌ Unknown action: ${action}`));
     console.log(chalk.gray('   Available actions: install, remove, status'));
     process.exit(1);
   }
 
-  if (!(await isInGitRepo())) {
-    console.error(chalk.red('❌ Not in a git repository.'));
-    process.exit(1);
-  }
+  const isGlobal = options.global ?? false;
 
-  const hooksPath = await getGitHooksPath();
-  const hookFile = join(hooksPath, HOOK_NAME);
+  if (isGlobal) {
+    // Global hook management
+    const globalHooksPath = getGlobalHooksPath();
+    const hookFile = join(globalHooksPath, HOOK_NAME);
 
-  if (action === 'status') {
-    await showStatus(hookFile);
-  } else if (action === 'install') {
-    await installHook(hookFile, hooksPath);
-  } else if (action === 'remove') {
-    await removeHook(hookFile);
+    if (action === 'status') {
+      await showGlobalStatus(hookFile, globalHooksPath);
+    } else if (action === 'install') {
+      await installGlobalHook(hookFile, globalHooksPath);
+    } else if (action === 'remove') {
+      await removeGlobalHook(hookFile, globalHooksPath);
+    }
+  } else {
+    // Local hook management (existing behavior)
+    if (!(await isInGitRepo())) {
+      console.error(chalk.red('❌ Not in a git repository.'));
+      console.log(chalk.gray('   Use --global to install hook for all repositories.'));
+      process.exit(1);
+    }
+
+    const hooksPath = await getGitHooksPath();
+    const hookFile = join(hooksPath, HOOK_NAME);
+
+    if (action === 'status') {
+      await showStatus(hookFile);
+    } else if (action === 'install') {
+      await installHook(hookFile, hooksPath);
+    } else if (action === 'remove') {
+      await removeHook(hookFile);
+    }
   }
 }
 
@@ -294,4 +331,112 @@ async function removeHook(hookFile: string): Promise<void> {
     unlinkSync(hookFile);
     console.log(chalk.green('✅ git-ai hook removed'));
   }
+}
+
+// ==================== Global Hook Functions ====================
+
+async function showGlobalStatus(hookFile: string, globalHooksPath: string): Promise<void> {
+  const currentGlobalPath = await getGlobalCoreHooksPath();
+
+  if (existsSync(hookFile) && currentGlobalPath === globalHooksPath) {
+    const content = readFileSync(hookFile, 'utf-8');
+    if (isGitAiHook(content)) {
+      console.log(chalk.green('✅ git-ai global hook is installed'));
+      console.log(chalk.gray(`   Location: ${hookFile}`));
+      console.log(chalk.gray(`   core.hooksPath: ${globalHooksPath}`));
+    } else {
+      console.log(chalk.yellow('⚠️  Global hook exists but is not from git-ai'));
+    }
+  } else if (currentGlobalPath) {
+    console.log(chalk.yellow('⚠️  Global core.hooksPath is set to a different location'));
+    console.log(chalk.gray(`   Current: ${currentGlobalPath}`));
+    console.log(chalk.gray(`   Expected: ${globalHooksPath}`));
+  } else {
+    console.log(chalk.gray('❌ git-ai global hook is not installed'));
+  }
+}
+
+async function installGlobalHook(hookFile: string, globalHooksPath: string): Promise<void> {
+  // Create global hooks directory if not exists
+  if (!existsSync(globalHooksPath)) {
+    mkdirSync(globalHooksPath, { recursive: true });
+  }
+
+  // Check if there's already a global hooks path configured
+  const currentGlobalPath = await getGlobalCoreHooksPath();
+  if (currentGlobalPath && currentGlobalPath !== globalHooksPath) {
+    console.log(chalk.yellow('⚠️  Global core.hooksPath is already set to:'));
+    console.log(chalk.gray(`   ${currentGlobalPath}`));
+    console.log(chalk.yellow('   This will override it. Existing hooks may stop working.'));
+    console.log('');
+  }
+
+  // Check if hook file already exists
+  if (existsSync(hookFile)) {
+    const content = readFileSync(hookFile, 'utf-8');
+    if (isGitAiHook(content)) {
+      console.log(chalk.yellow('⚠️  Global hook already installed, updating...'));
+    }
+  }
+
+  // Write hook script
+  writeFileSync(hookFile, HOOK_SCRIPT);
+  chmodSync(hookFile, 0o755);
+
+  // Set global core.hooksPath
+  await execa('git', ['config', '--global', 'core.hooksPath', globalHooksPath]);
+
+  console.log(chalk.green('✅ git-ai global hook installed'));
+  console.log(chalk.gray(`   Location: ${hookFile}`));
+  console.log(chalk.gray(`   core.hooksPath: ${globalHooksPath}`));
+  console.log('');
+  console.log(chalk.cyan('📝 How it works:'));
+  console.log(chalk.gray('   All git repositories will now use git-ai to'));
+  console.log(chalk.gray('   auto-generate commit messages when you run `git commit`.'));
+  console.log('');
+  console.log(chalk.cyan('💡 Tips:'));
+  console.log(chalk.gray('   • Skip hook: git commit --no-verify'));
+  console.log(chalk.gray('   • Disable temporarily: GIT_AI_DISABLED=1 git commit'));
+  console.log(chalk.gray('   • Remove global hook: git-ai hook remove --global'));
+  console.log('');
+  console.log(chalk.yellow('⚠️  Note: Local repository hooks (.git/hooks) will be ignored'));
+  console.log(chalk.gray('   when global core.hooksPath is set.'));
+}
+
+async function removeGlobalHook(hookFile: string, globalHooksPath: string): Promise<void> {
+  const currentGlobalPath = await getGlobalCoreHooksPath();
+
+  if (!currentGlobalPath) {
+    console.log(chalk.gray('❌ No global hook configured'));
+    return;
+  }
+
+  if (currentGlobalPath !== globalHooksPath) {
+    console.log(chalk.yellow('⚠️  Global core.hooksPath points to a different location:'));
+    console.log(chalk.gray(`   ${currentGlobalPath}`));
+    console.log(chalk.gray('   Not removing to avoid breaking other hooks.'));
+    return;
+  }
+
+  if (!existsSync(hookFile)) {
+    // Just unset the config
+    await execa('git', ['config', '--global', '--unset', 'core.hooksPath']);
+    console.log(chalk.green('✅ Global core.hooksPath removed'));
+    return;
+  }
+
+  const content = readFileSync(hookFile, 'utf-8');
+  if (!isGitAiHook(content)) {
+    console.log(chalk.yellow('⚠️  The global hook is not from git-ai, skipping removal'));
+    return;
+  }
+
+  // Remove hook file
+  unlinkSync(hookFile);
+
+  // Unset global core.hooksPath
+  await execa('git', ['config', '--global', '--unset', 'core.hooksPath']);
+
+  console.log(chalk.green('✅ git-ai global hook removed'));
+  console.log(chalk.gray('   Local repository hooks will now work again.'));
 }
