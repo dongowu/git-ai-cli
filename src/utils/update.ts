@@ -67,7 +67,8 @@ function printUpdateMessage(current: string, latest: string) {
 
 function center(str: string, width: number): string {
   // Strip ansi codes for length calculation
-  const visibleLen = str.replace(/\u001b[[\]\d+m/g, '').length;
+  // eslint-disable-next-line no-control-regex
+  const visibleLen = str.replace(new RegExp('\\x1b\\[\\d+m', 'g'), '').length;
   const padding = Math.max(0, width - visibleLen);
   const left = Math.floor(padding / 2);
   const right = padding - left;
