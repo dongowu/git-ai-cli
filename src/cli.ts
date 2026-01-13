@@ -12,7 +12,8 @@ process.emit = function (name: any, data: any, ...args: any[]) {
   ) {
     return false;
   }
-  return originalEmit.apply(process, [name, data, ...args]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return originalEmit.apply(process, [name, data, ...args] as any);
 } as any;
 
 import { cac } from 'cac';
