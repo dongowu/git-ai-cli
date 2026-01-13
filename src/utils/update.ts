@@ -1,7 +1,9 @@
 import https from 'node:https';
+import { createRequire } from 'node:module';
 import chalk from 'chalk';
-// @ts-ignore
-import packageJson from '../../package.json' assert { type: 'json' };
+
+const require = createRequire(import.meta.url);
+const packageJson = require('../../package.json');
 
 const REGISTRY_URL = 'https://registry.npmjs.org/@dongowu/git-ai-cli/latest';
 
