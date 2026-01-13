@@ -1,5 +1,20 @@
 #!/usr/bin/env node
 
+// Suppress punycode deprecation warning (node 21+)
+const originalEmit = process.emit;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+process.emit = function (name: any, data: any, ...args: any[]) {
+  if (
+    name === 'warning' &&
+    typeof data === 'object' &&
+    data?.name === 'DeprecationWarning' &&
+    data?.message?.includes('punycode')
+  ) {
+    return false;
+  }
+  return originalEmit.apply(process, [name, data, ...args]);
+} as any;
+
 import { cac } from 'cac';
 import chalk from 'chalk';
 import { createRequire } from 'node:module';
@@ -8,6 +23,7 @@ import { runCommit } from './commands/commit.js';
 import { runMsg } from './commands/msg.js';
 import { runHook } from './commands/hook.js';
 import { runReport } from './commands/report.js';
+import { checkUpdate } from './utils/update.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version?: string };
@@ -124,4 +140,7 @@ cli
 cli.help();
 cli.version(pkg.version || '0.0.0');
 
-cli.parse();
+// Check for updates asynchronously
+checkUpdate().then(() => {
+  cli.parse();
+});
