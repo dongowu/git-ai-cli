@@ -12,6 +12,14 @@ Rules:
 4. Use imperative mood ("add" not "added")
 5. Don't end the subject line with a period
 6. If needed, add a blank line followed by a body for more details
+7. Git Flow Branch Mapping (Priority):
+   - feature/* -> type: feat
+   - bugfix/* -> type: fix
+   - hotfix/* -> type: fix
+   - release/* -> type: chore
+    - docs/* -> type: docs
+    - If branch name matches, infer <scope> from it (e.g. feature/login -> feat(login): ...)
+    - If branch name doesn't match these patterns, ignore it and infer type/scope strictly from the code changes.
 
 Only output the commit message, nothing else.`;
 
@@ -26,6 +34,14 @@ const DEFAULT_SYSTEM_PROMPT_ZH = `你是一个专业的 Git commit message 编�
 4. 使用祈使语气
 5. subject 末尾不要加句号
 6. 如需要，空一行后添加 body 提供更多细节
+7. Git Flow 分支映射规则 (优先级最高):
+   - feature/* -> type: feat
+   - bugfix/* -> type: fix
+   - hotfix/* -> type: fix
+   - release/* -> type: chore
+   - docs/* -> type: docs
+   - 如果分支名匹配，请从中推断 <scope> (例如: feature/login -> feat(login): ...)
+   - 如果分支名不符合上述标准前缀，请忽略分支名，仅依据代码变更内容(diff)来决定 type 和 scope。
 
 只输出 commit message，不要输出其他内容。`;
 
@@ -39,6 +55,14 @@ const DEEPSEEK_PROMPT_ZH = `你是一个智能编程助手，专注于生成高�
 3. 描述(subject)需简洁有力，50字符以内，使用中文。
 4. 如果变更复杂，请在 subject 后空一行，添加详细的 body 说明。
 5. 专注于*为什么*变更，而不仅仅是*改了什么*。
+6. Git Flow 分支映射规则 (优先级最高):
+   - feature/* -> type: feat
+   - bugfix/* -> type: fix
+   - hotfix/* -> type: fix
+   - release/* -> type: chore
+   - docs/* -> type: docs
+   - 如果分支名匹配，请从中推断 <scope> (例如: feature/login -> feat(login): ...)
+   - 如果分支名不符合上述标准前缀，请忽略分支名，仅依据代码变更内容(diff)来决定 type 和 scope。
 
 只输出最终的 Commit Message，不包含 Markdown 代码块或其他解释。`;
 

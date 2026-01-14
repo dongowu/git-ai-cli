@@ -16,11 +16,11 @@
 </p>
 
 <p align="center">
+  <a href="./README_EN.md">English</a> •
   <a href="#-快速开始">快速开始</a> •
   <a href="#-核心特性">核心特性</a> •
   <a href="#-git-flow-最佳实践">Git Flow</a> •
-  <a href="#-智能周报">智能周报</a> •
-  <a href="#english">English</a>
+  <a href="#-智能周报">智能周报</a>
 </p>
 
 ---
@@ -165,49 +165,7 @@ git-ai report --days 30
 
 ---
 
-## English
 
-### Installation
-
-```bash
-npm install -g @dongowu/git-ai-cli
-```
-
-### Features
-
-- **Style Learning**: Automatically learns from your recent commits to mimic your personal style and conventions.
-- **Context Aware**: Understands your Git branch (e.g., `feat/login`) to generate semantically correct commits.
-- **Project Config**: Supports `.git-ai.json` for team-wide configuration and `.git-aiignore` for file exclusion.
-- **Privacy First**: Seamless support for local **Ollama** models.
-- **Git Hooks**: `git-ai hook install` integrates AI directly into your `git commit` workflow.
-- **AI Reports**: `git-ai report` turns your commit history into professional weekly reports.
-
-### Usage
-
-**1. Setup**
-```bash
-git-ai init
-```
-
-**2. Commit**
-```bash
-git add .
-git-ai
-```
-
-**3. Generate Report**
-```bash
-git-ai report
-```
-
-### Git Hook Integration (Recommended)
-
-```bash
-git-ai hook install --global
-```
-Now just run `git commit` as usual, and AI will handle the rest!
-
----
 
 ## 📄 License
 

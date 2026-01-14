@@ -1,0 +1,162 @@
+<p align="center">
+  <h1 align="center">git-ai-cli</h1>
+  <p align="center">
+    <strong>🤖 AI-Powered Git Assistant: Commit, Context & Report</strong>
+  </p>
+  <p align="center">
+    🚀 <strong>DeepSeek</strong> Optimized | 🏠 <strong>Ollama</strong> Privacy First | 🧠 <strong>Context Aware</strong> | 📊 <strong>AI Reports</strong>
+  </p>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@dongowu/git-ai-cli"><img src="https://img.shields.io/npm/v/@dongowu/git-ai-cli.svg?style=flat-square" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/@dongowu/git-ai-cli"><img src="https://img.shields.io/npm/dm/@dongowu/git-ai-cli.svg?style=flat-square" alt="npm downloads"></a>
+  <a href="https://github.com/dongowu/git-ai-cli/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/@dongowu/git-ai-cli.svg?style=flat-square" alt="license"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/@dongowu/git-ai-cli.svg?style=flat-square" alt="node version"></a>
+</p>
+
+<p align="center">
+  <a href="./README.md">中文文档</a> •
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-features">Features</a> •
+  <a href="#-usage">Usage</a> •
+  <a href="#-configuration">Configuration</a>
+</p>
+
+---
+
+**git-ai-cli** is more than just a commit message generator. It's your **AI Development Assistant**. It understands your code diffs, recognizes your branch intent, and even writes your weekly reports.
+
+---
+
+## 🚀 Quick Start
+
+```bash
+# 1. Install
+npm install -g @dongowu/git-ai-cli
+
+# 2. Initialize (Auto-detects local models or configures API)
+git-ai init
+
+# 3. Use
+git add .
+git-ai
+```
+
+---
+
+## ✨ Features
+
+### 1. 🔒 Privacy First & Local Models
+- **Ollama Zero-Config**: Automatically detects locally running Ollama models (like `llama3`, `deepseek-coder`). No manual setup required. Your data never leaves your machine.
+- **DeepSeek/OpenAI**: Built-in support for popular API providers with optimized prompts.
+
+### 2. 🧠 Context Aware
+- **Style Learning**: Automatically analyzes your recent 10 commits to mimic your personal tone, format (e.g., emojis), and language style.
+- **Branch Awareness**: Reads your current branch name (e.g., `feat/user-login`, `fix/JIRA-123`) to generate semantic commits with Issue IDs or scopes.
+
+### 3. ⚙️ Engineering Ready
+- **Project Config**: Create a `.git-ai.json` in your project root to share settings (model, prompts) with your team.
+- **Smart Ignore**: Use `.git-aiignore` to exclude auto-generated files (like `package-lock.json`) or large files to save tokens and improve accuracy.
+
+### 4. 🪝 Seamless Integration (Git Hook)
+- **Zero Distraction**: After installing the hook, just run `git commit` (without `-m`). AI automatically fills in the message and opens your editor.
+- **Compatibility**: Perfectly compatible with existing Git workflows. Supports `git commit --no-verify`.
+
+### 5. 📊 AI Reports
+- **One-Click Generation**: `git-ai report` analyzes your recent commits.
+- **Value Driven**: Transforms fragmented commits into structured reports highlighting "Core Outputs", "Bug Fixes", and "Technical Improvements".
+
+---
+
+## ⚙️ Configuration
+
+### Project-Level Config `.git-ai.json`
+Create this file in your project root to override global settings:
+
+```json
+{
+  "model": "deepseek-coder",
+  "temperature": 0.5,
+  "locale": "en",
+  "customPrompt": "Always start with an emoji."
+}
+```
+
+### Ignore File `.git-aiignore`
+Exclude specific files from AI analysis (syntax similar to `.gitignore`):
+
+```text
+package-lock.json
+dist/
+*.min.js
+```
+
+---
+
+## 📖 Usage
+
+### Scenario 1: Interactive
+```bash
+git add .
+git-ai
+```
+
+### Scenario 2: Git Hook (Recommended) 🌟
+The smoothest experience. Install once, use forever.
+
+```bash
+# Install for current project
+git-ai hook install
+
+# Or install globally (for all projects)
+git-ai hook install --global
+```
+
+**Then just run:**
+```bash
+git checkout -b feature/awesome-login
+# ... write code ...
+git add .
+git commit  # ✨ AI generates "feat(login): implement awesome login logic"
+```
+
+### Scenario 3: Generate Reports
+Hate writing weekly reports?
+
+```bash
+# Generate report for this week
+git-ai report
+
+# Generate report for the last 30 days
+git-ai report --days 30
+```
+
+---
+
+## 🛠 Command Reference
+
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `git-ai init` | `config` | **Initialize Config** (Provider, Key, Language) |
+| `git-ai` | | Interactive generation & commit |
+| `git-ai -y` | | Skip confirmation and commit directly |
+| `git-ai -n 3` | | Generate 3 options to choose from |
+| `git-ai -l en` | | Force language (en/zh) |
+| `git-ai hook install` | | **Install Git Hook** (supports `--global`) |
+| `git-ai report` | | **Generate AI Report** (supports `--days`) |
+| `git-ai msg` | | Generate message only (stdout for scripts) |
+
+---
+
+## 📄 License
+
+[MIT](LICENSE)
+
+---
+
+<p align="center">
+  Made with ❤️ by git-ai team
+  <br>
+  <sub>🤖 Generated by git-ai 🚀</sub>
+</p>
