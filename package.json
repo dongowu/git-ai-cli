@@ -26,7 +26,10 @@
     "cli",
     "openai",
     "deepseek",
-    "ollama"
+    "ollama",
+    "style-learning",
+    "git-hook",
+    "productivity"
   ],
   "author": "",
   "license": "MIT",

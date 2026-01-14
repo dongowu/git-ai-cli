@@ -1,5 +1,32 @@
 import { execa } from 'execa';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { DIFF_BLACKLIST, MAX_DIFF_LENGTH } from '../types.js';
+
+let cachedIgnorePatterns: string[] | null = null;
+
+function getIgnorePatterns(): string[] {
+  if (cachedIgnorePatterns) return cachedIgnorePatterns;
+
+  const patterns = [...DIFF_BLACKLIST];
+  const ignorePath = join(process.cwd(), '.git-aiignore');
+
+  if (existsSync(ignorePath)) {
+    try {
+      const content = readFileSync(ignorePath, 'utf-8');
+      const lines = content
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith('#'));
+      patterns.push(...lines);
+    } catch {
+      // ignore error
+    }
+  }
+
+  cachedIgnorePatterns = patterns;
+  return patterns;
+}
 
 export async function isGitInstalled(): Promise<boolean> {
   try {
@@ -39,7 +66,8 @@ export async function getStagedFiles(): Promise<string[]> {
 }
 
 export function isBlacklisted(filename: string): boolean {
-  return DIFF_BLACKLIST.some((pattern) => {
+  const patterns = getIgnorePatterns();
+  return patterns.some((pattern) => {
     if (pattern.endsWith('/')) {
       return filename.startsWith(pattern) || filename.includes(`/${pattern}`);
     }

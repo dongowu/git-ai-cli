@@ -36,19 +36,21 @@ cli
   .command('', 'Generate AI-powered commit message (interactive)')
   .option('-y, --yes', 'Skip confirmation and commit directly')
   .option('-n, --num <count>', 'Generate multiple commit messages to choose from', { default: 1 })
+  .option('-l, --locale <locale>', 'Override locale (zh/en)')
   .option('--hook', '[deprecated] Use `git-ai msg` instead')
-  .action(async (options: { yes?: boolean; num?: number; hook?: boolean }) => {
+  .action(async (options: { yes?: boolean; num?: number; hook?: boolean; locale?: string }) => {
     try {
       // Deprecated --hook redirects to msg command behavior
       if (options.hook) {
         const { runMsg } = await import('./commands/msg.js');
-        await runMsg({ quiet: true });
+        await runMsg({ quiet: true, locale: options.locale });
         return;
       }
 
       await runCommit({
         autoCommit: options.yes ?? false,
         numChoices: Math.min(Math.max(Number(options.num) || 1, 1), 5),
+        locale: options.locale,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -62,11 +64,13 @@ cli
   .command('commit', 'Generate and commit with AI message (interactive)')
   .option('-y, --yes', 'Skip confirmation and commit directly')
   .option('-n, --num <count>', 'Generate multiple commit messages to choose from', { default: 1 })
-  .action(async (options: { yes?: boolean; num?: number }) => {
+  .option('-l, --locale <locale>', 'Override locale (zh/en)')
+  .action(async (options: { yes?: boolean; num?: number; locale?: string }) => {
     try {
       await runCommit({
         autoCommit: options.yes ?? false,
         numChoices: Math.min(Math.max(Number(options.num) || 1, 1), 5),
+        locale: options.locale,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -81,12 +85,14 @@ cli
   .option('-n, --num <count>', 'Generate multiple messages', { default: 1 })
   .option('--json', 'Output as JSON')
   .option('--quiet', 'Suppress spinner and colors')
-  .action(async (options: { num?: number; json?: boolean; quiet?: boolean }) => {
+  .option('-l, --locale <locale>', 'Override locale (zh/en)')
+  .action(async (options: { num?: number; json?: boolean; quiet?: boolean; locale?: string }) => {
     try {
       await runMsg({
         num: Math.min(Math.max(Number(options.num) || 1, 1), 5),
         json: options.json ?? false,
         quiet: options.quiet ?? false,
+        locale: options.locale,
       });
     } catch (error) {
       if (options.json) {

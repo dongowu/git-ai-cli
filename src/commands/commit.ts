@@ -9,6 +9,7 @@ import {
   getFilteredDiff,
   commit,
   getBranchName,
+  getRecentCommits,
 } from '../utils/git.js';
 import {
   createAIClient,
@@ -23,6 +24,7 @@ export interface CommitOptions {
   autoCommit?: boolean;
   numChoices?: number;
   hookMode?: boolean;
+  locale?: string;
 }
 
 function exitWithError(message: string, hint?: string, silent = false): never {
@@ -36,7 +38,7 @@ function exitWithError(message: string, hint?: string, silent = false): never {
 }
 
 export async function runCommit(options: CommitOptions = {}): Promise<void> {
-  const { autoCommit = false, numChoices = 1, hookMode = false } = options;
+  const { autoCommit = false, numChoices = 1, hookMode = false, locale } = options;
 
   // Recursion guard - prevent hook from triggering another git-ai
   if (process.env.GIT_AI_RUNNING === '1') {
@@ -71,6 +73,11 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
     exitWithError('Configuration not found.', 'Run `git-ai config` to set up your AI provider.');
   }
 
+  // Override locale if provided
+  if (locale && (locale === 'zh' || locale === 'en')) {
+    config.locale = locale as 'zh' | 'en';
+  }
+
   // Show staged files (skip in hook mode)
   if (!hookMode) {
     console.log(chalk.cyan('\n📁 Staged files:'));
@@ -82,6 +89,7 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
   // Get filtered diff
   const { diff, truncated, ignoredFiles } = await getFilteredDiff(stagedFiles);
   const branchName = await getBranchName();
+  const recentCommits = await getRecentCommits(10); // Get last 10 commits for style reference
 
   if (!hookMode) {
     if (ignoredFiles.length > 0) {
@@ -97,7 +105,14 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
 
   // Create AI client
   const client = createAIClient(config);
-  const input: CommitMessageGenerationInput = { diff, stagedFiles, ignoredFiles, truncated, branchName };
+  const input: CommitMessageGenerationInput = {
+    diff,
+    stagedFiles,
+    ignoredFiles,
+    truncated,
+    branchName,
+    recentCommits,
+  };
 
   // Generate commit message(s)
   let commitMessage: string;
@@ -105,7 +120,8 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
   if (hookMode) {
     // Hook mode: silent generation, output only the message
     try {
-      commitMessage = await generateCommitMessage(client, input, config);
+      const messages = await generateCommitMessage(client, input, config);
+      commitMessage = messages[0];
       console.log(commitMessage);
       return;
     } catch {
@@ -216,9 +232,9 @@ async function generateWithSpinner(
   }).start();
 
   try {
-    const message = await generateCommitMessage(client, input, config);
+    const messages = await generateCommitMessage(client, input, config);
     spinner.succeed('Commit message generated!');
-    return message;
+    return messages[0];
   } catch (error) {
     spinner.fail('Failed to generate commit message');
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -238,10 +254,9 @@ async function generateMultipleWithSpinner(
   }).start();
 
   try {
-    const promises = Array.from({ length: count }, () =>
-      generateCommitMessage(client, input, config)
-    );
-    const messages = await Promise.all(promises);
+    // Optimized: Single request for multiple choices
+    const messages = await generateCommitMessage(client, input, config, count);
+    
     // Dedupe
     const unique = [...new Set(messages)];
     spinner.succeed(`Generated ${unique.length} commit message(s)!`);
