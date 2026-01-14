@@ -52,16 +52,45 @@ git-ai
 - **Ollama 零配置**：自动探测本地运行的 Ollama 模型（如 `llama3`, `deepseek-coder`），无需手动输入模型名。数据完全不出网，绝对安全。
 
 ### 2. 🧠 上下文感知 (Context Aware)
-- **分支感知**：AI 会读取当前分支名（如 `feat/user-login`, `fix/JIRA-123`）。
-- **语义生成**：结合分支语义，生成包含 Issue ID 或功能模块的规范提交信息。
+- **风格学习**：自动分析您最近的 10 次提交记录，模仿您的语气、格式（如 Emoji 使用习惯）和语言风格。
+- **分支感知**：读取当前分支名（如 `feat/user-login`, `fix/JIRA-123`），生成包含 Issue ID 或功能模块的规范提交信息。
 
-### 3. 🪝 无感集成 (Git Hook)
+### 3. ⚙️ 工程化配置 (Project Config)
+- **项目级配置**：支持在项目根目录创建 `.git-ai.json`，团队统一共享模型和 Prompt 配置（优先级 > 全局配置）。
+- **智能忽略**：支持 `.git-aiignore` 文件，排除自动生成文件（如 `package-lock.json`）或大文件，节省 Token 并提高准确性。
+
+### 4. 🪝 无感集成 (Git Hook)
 - **零打扰**：安装 Hook 后，只需执行 `git commit`（不带 `-m`），AI 自动填充消息并打开编辑器。
 - **兼容性**：完美兼容现有 Git 工作流，支持 `git commit --no-verify` 跳过。
 
 ### 4. 📊 智能周报 (AI Report)
 - **一键生成**：`git-ai report` 自动分析你最近的代码提交。
 - **价值导向**：将零碎的 Commit 转化为结构化的“核心产出”、“问题修复”和“技术优化”报告。
+
+---
+
+## ⚙️ 高级配置
+
+### 项目级配置文件 `.git-ai.json`
+在项目根目录创建此文件，可覆盖全局设置，方便团队统一规范：
+
+```json
+{
+  "model": "deepseek-coder",
+  "temperature": 0.5,
+  "locale": "zh-CN",
+  "customPrompt": "Always start with an emoji."
+}
+```
+
+### 忽略文件 `.git-aiignore`
+在项目根目录创建，用于排除不想发送给 AI 的文件（语法同 `.gitignore`）：
+
+```text
+package-lock.json
+dist/
+*.min.js
+```
 
 ---
 
@@ -146,7 +175,9 @@ npm install -g @dongowu/git-ai-cli
 
 ### Features
 
+- **Style Learning**: Automatically learns from your recent commits to mimic your personal style and conventions.
 - **Context Aware**: Understands your Git branch (e.g., `feat/login`) to generate semantically correct commits.
+- **Project Config**: Supports `.git-ai.json` for team-wide configuration and `.git-aiignore` for file exclusion.
 - **Privacy First**: Seamless support for local **Ollama** models.
 - **Git Hooks**: `git-ai hook install` integrates AI directly into your `git commit` workflow.
 - **AI Reports**: `git-ai report` turns your commit history into professional weekly reports.

@@ -7,6 +7,7 @@ import {
   getStagedFiles,
   getFilteredDiff,
   getBranchName,
+  getRecentCommits,
 } from '../utils/git.js';
 import {
   createAIClient,
@@ -18,6 +19,7 @@ export interface MsgOptions {
   json?: boolean;
   quiet?: boolean;
   num?: number;
+  locale?: string;
 }
 
 export interface MsgResult {
@@ -43,7 +45,7 @@ function exitWithError(message: string, options: MsgOptions): never {
 }
 
 export async function runMsg(options: MsgOptions = {}): Promise<void> {
-  const { json = false, quiet = false, num = 1 } = options;
+  const { json = false, quiet = false, num = 1, locale } = options;
 
   // Environment checks
   if (!(await isGitInstalled())) {
@@ -65,13 +67,26 @@ export async function runMsg(options: MsgOptions = {}): Promise<void> {
     exitWithError('Configuration not found. Run `git-ai config` first.', options);
   }
 
+  // Override locale if provided
+  if (locale && (locale === 'zh' || locale === 'en')) {
+    config.locale = locale as 'zh' | 'en';
+  }
+
   // Get filtered diff
   const { diff, truncated, ignoredFiles } = await getFilteredDiff(stagedFiles);
   const branchName = await getBranchName();
+  const recentCommits = await getRecentCommits(10);
 
   // Create AI client
   const client = createAIClient(config);
-  const input: CommitMessageGenerationInput = { diff, stagedFiles, ignoredFiles, truncated, branchName };
+  const input: CommitMessageGenerationInput = {
+    diff,
+    stagedFiles,
+    ignoredFiles,
+    truncated,
+    branchName,
+    recentCommits,
+  };
 
   // Generate message(s)
   try {
@@ -86,10 +101,7 @@ export async function runMsg(options: MsgOptions = {}): Promise<void> {
 
     if (num > 1) {
       // Generate multiple messages
-      const promises = Array.from({ length: num }, () =>
-        generateCommitMessage(client, input, config)
-      );
-      const messages = await Promise.all(promises);
+      const messages = await generateCommitMessage(client, input, config, num);
       const unique = [...new Set(messages)];
 
       if (spinner) {
@@ -115,7 +127,8 @@ export async function runMsg(options: MsgOptions = {}): Promise<void> {
       }
     } else {
       // Single message
-      const message = await generateCommitMessage(client, input, config);
+      const messages = await generateCommitMessage(client, input, config);
+      const message = messages[0];
 
       if (spinner) {
         spinner.stop();

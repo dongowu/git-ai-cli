@@ -1,4 +1,6 @@
 import Conf from 'conf';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { AIConfig } from '../types.js';
 
 const config = new Conf<AIConfig>({
@@ -32,19 +34,39 @@ const config = new Conf<AIConfig>({
   },
 });
 
-export function getConfig(): AIConfig | null {
-  const provider = config.get('provider');
-  if (!provider) {
-    return null;
+function getLocalConfig(): Partial<AIConfig> {
+  const localPath = join(process.cwd(), '.git-ai.json');
+  if (existsSync(localPath)) {
+    try {
+      const content = readFileSync(localPath, 'utf-8');
+      return JSON.parse(content);
+    } catch {
+      // Ignore invalid config
+    }
   }
-  return {
+  return {};
+}
+
+export function getConfig(): AIConfig | null {
+  const globalConfig = {
     provider: config.get('provider'),
     apiKey: config.get('apiKey'),
     baseUrl: config.get('baseUrl'),
     model: config.get('model'),
     locale: config.get('locale'),
     customPrompt: config.get('customPrompt'),
+    enableFooter: config.get('enableFooter'),
   };
+
+  const localConfig = getLocalConfig();
+  const finalConfig = { ...globalConfig, ...localConfig };
+
+  // Provider is mandatory (either global or local)
+  if (!finalConfig.provider) {
+    return null;
+  }
+
+  return finalConfig as AIConfig;
 }
 
 export function setConfig(newConfig: Partial<AIConfig>): void {
