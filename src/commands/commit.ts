@@ -10,6 +10,8 @@ import {
   commit,
   getBranchName,
   getRecentCommits,
+  getUnstagedFiles,
+  addFiles,
 } from '../utils/git.js';
 import {
   createAIClient,
@@ -58,13 +60,39 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
     exitWithError('Not in a git repository.', undefined, hookMode);
   }
 
-  const stagedFiles = await getStagedFiles();
+  let stagedFiles = await getStagedFiles();
+  
   if (stagedFiles.length === 0) {
-    exitWithError(
-      'No staged changes found.',
-      'Use `git add <files>` to stage your changes first.',
-      hookMode
-    );
+    // Interactive add
+    const unstagedFiles = await getUnstagedFiles();
+    
+    if (unstagedFiles.length > 0 && !hookMode) {
+      console.log(chalk.yellow('⚠️  No staged changes found.'));
+      const { selectedFiles } = await inquirer.prompt<{ selectedFiles: string[] }>([
+        {
+          type: 'checkbox',
+          name: 'selectedFiles',
+          message: 'Select files to stage:',
+          choices: unstagedFiles,
+          pageSize: 15,
+        },
+      ]);
+
+      if (selectedFiles.length > 0) {
+        await addFiles(selectedFiles);
+        stagedFiles = await getStagedFiles();
+        console.log(chalk.green(`✅ Staged ${selectedFiles.length} files.`));
+      } else {
+        console.log(chalk.gray('No files selected. Exiting.'));
+        process.exit(0);
+      }
+    } else {
+      exitWithError(
+        'No staged changes found.',
+        'Use `git add <files>` to stage your changes first.',
+        hookMode
+      );
+    }
   }
 
   // Check config

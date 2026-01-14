@@ -175,3 +175,28 @@ export async function getRecentCommits(days: number): Promise<string[]> {
     return [];
   }
 }
+
+export async function getUnstagedFiles(): Promise<string[]> {
+  try {
+    const { stdout } = await execa('git', ['status', '--porcelain']);
+    if (!stdout) return [];
+
+    return stdout
+      .split('\n')
+      .filter((line) => line.trim())
+      .filter((line) => {
+        // Check if there are unstaged changes
+        // Index 1 is the worktree status. ' ' means unmodified in worktree (relative to index).
+        // ?? is untracked.
+        return line[1] !== ' ' || line.startsWith('??');
+      })
+      .map((line) => line.substring(3).trim());
+  } catch {
+    return [];
+  }
+}
+
+export async function addFiles(files: string[]): Promise<void> {
+  if (files.length === 0) return;
+  await execa('git', ['add', ...files]);
+}
