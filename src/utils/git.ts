@@ -65,6 +65,40 @@ export async function getStagedFiles(): Promise<string[]> {
   return stdout.split('\n').filter(Boolean);
 }
 
+export interface FileStat {
+  file: string;
+  insertions: number;
+  deletions: number;
+}
+
+export async function getFileStats(): Promise<FileStat[]> {
+  try {
+    const { stdout } = await execa('git', ['diff', '--cached', '--numstat']);
+    return stdout
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const [insertions, deletions, file] = line.split('\t');
+        return {
+          file,
+          insertions: parseInt(insertions) || 0,
+          deletions: parseInt(deletions) || 0,
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
+export async function getFileDiff(file: string): Promise<string> {
+  try {
+    const { stdout } = await execa('git', ['diff', '--cached', '--', file]);
+    return stdout;
+  } catch {
+    return '';
+  }
+}
+
 export function isBlacklisted(filename: string): boolean {
   const patterns = getIgnorePatterns();
   return patterns.some((pattern) => {
@@ -173,6 +207,16 @@ export async function getRecentCommits(days: number): Promise<string[]> {
     return stdout.split('\n').filter((line) => line.trim());
   } catch {
     return [];
+  }
+}
+
+export async function searchCode(pattern: string): Promise<string> {
+  try {
+    // Use git grep to search in tracked files (it's faster and respects .gitignore)
+    const { stdout } = await execa('git', ['grep', '-n', '--max-depth=3', pattern]);
+    return stdout;
+  } catch {
+    return 'No matches found.';
   }
 }
 

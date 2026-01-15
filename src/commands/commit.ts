@@ -27,6 +27,7 @@ export interface CommitOptions {
   numChoices?: number;
   hookMode?: boolean;
   locale?: string;
+  agentMode?: boolean;
 }
 
 function exitWithError(message: string, hint?: string, silent = false): never {
@@ -140,6 +141,7 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
     truncated,
     branchName,
     recentCommits,
+    forceAgent: options.agentMode,
   };
 
   // Generate commit message(s)

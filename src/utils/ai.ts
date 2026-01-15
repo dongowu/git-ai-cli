@@ -1,5 +1,8 @@
 import OpenAI from 'openai';
 import type { AIConfig } from '../types.js';
+import { runAgentLoop } from './agent.js';
+import { getFileStats } from './git.js';
+import chalk from 'chalk';
 
 const DEFAULT_SYSTEM_PROMPT_EN = `You are an expert at writing Git commit messages following the Conventional Commits specification.
 
@@ -82,6 +85,8 @@ export interface CommitMessageGenerationInput {
   truncated?: boolean;
   branchName?: string;
   recentCommits?: string[];
+  forceAgent?: boolean;
+  quiet?: boolean;
 }
 
 export async function generateCommitMessage(
@@ -90,6 +95,25 @@ export async function generateCommitMessage(
   config: AIConfig,
   numChoices = 1
 ): Promise<string[]> {
+  // Auto-enable Agent for critical branches in Git Flow
+  const isCriticalBranch = input.branchName && /^(release|hotfix|master|main)/.test(input.branchName);
+  const shouldRunAgent = (input.truncated || input.forceAgent || isCriticalBranch) && numChoices === 1;
+
+  // Trigger Agent Mode if diff is truncated OR forced by user OR critical branch
+  if (shouldRunAgent) {
+    try {
+      const stats = await getFileStats();
+      if (stats.length > 0) {
+        const agentMessage = await runAgentLoop(client, config, stats, input.branchName, input.quiet);
+        return [agentMessage];
+      }
+    } catch (error) {
+      if (!input.quiet) {
+        console.error(chalk.yellow('\n⚠️  Agent mode failed, falling back to basic mode...'));
+      }
+    }
+  }
+
   let systemPrompt = config.customPrompt;
 
   if (!systemPrompt) {

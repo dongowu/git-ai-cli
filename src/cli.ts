@@ -37,8 +37,9 @@ cli
   .option('-y, --yes', 'Skip confirmation and commit directly')
   .option('-n, --num <count>', 'Generate multiple commit messages to choose from', { default: 1 })
   .option('-l, --locale <locale>', 'Override locale (zh/en)')
+  .option('-a, --agent', 'Use Agent mode for deep analysis and impact checking')
   .option('--hook', '[deprecated] Use `git-ai msg` instead')
-  .action(async (options: { yes?: boolean; num?: number; hook?: boolean; locale?: string }) => {
+  .action(async (options: { yes?: boolean; num?: number; hook?: boolean; locale?: string; agent?: boolean }) => {
     try {
       // Deprecated --hook redirects to msg command behavior
       if (options.hook) {
@@ -51,6 +52,7 @@ cli
         autoCommit: options.yes ?? false,
         numChoices: Math.min(Math.max(Number(options.num) || 1, 1), 5),
         locale: options.locale,
+        agentMode: options.agent,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -65,12 +67,14 @@ cli
   .option('-y, --yes', 'Skip confirmation and commit directly')
   .option('-n, --num <count>', 'Generate multiple commit messages to choose from', { default: 1 })
   .option('-l, --locale <locale>', 'Override locale (zh/en)')
-  .action(async (options: { yes?: boolean; num?: number; locale?: string }) => {
+  .option('-a, --agent', 'Use Agent mode for deep analysis and impact checking')
+  .action(async (options: { yes?: boolean; num?: number; locale?: string; agent?: boolean }) => {
     try {
       await runCommit({
         autoCommit: options.yes ?? false,
         numChoices: Math.min(Math.max(Number(options.num) || 1, 1), 5),
         locale: options.locale,
+        agentMode: options.agent,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';

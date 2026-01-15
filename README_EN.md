@@ -55,7 +55,13 @@ git-ai
 - **Style Learning**: Automatically analyzes your recent 10 commits to mimic your personal tone, format (e.g., emojis), and language style.
 - **Branch Awareness**: Reads your current branch name (e.g., `feat/user-login`, `fix/JIRA-123`) to generate semantic commits with Issue IDs or scopes.
 
-### 3. ⚙️ Engineering Ready
+### 3. 🤖 Agent Intelligence (New)
+Evolving from a text generator to a code expert.
+- **Smart Diff**: No more truncated diffs. The Agent automatically analyzes file stats and reads only the critical source code, solving token limits for large refactors.
+- **Impact Analysis**: Changing a core API? The Agent proactively searches your codebase (`git grep`) to find usages and warns you about potential breaking changes in the commit body.
+- **Git Flow Guard**: Automatically enables deep analysis on `release/*` or `hotfix/*` branches to protect production code.
+
+### 4. ⚙️ Engineering Ready
 - **Project Config**: Create a `.git-ai.json` in your project root to share settings (model, prompts) with your team.
 - **Smart Ignore**: Use `.git-aiignore` to exclude auto-generated files (like `package-lock.json`) or large files to save tokens and improve accuracy.
 
@@ -140,6 +146,7 @@ git-ai report --days 30
 |---------|-------|-------------|
 | `git-ai init` | `config` | **Initialize Config** (Provider, Key, Language) |
 | `git-ai` | | Interactive generation & commit |
+| `git-ai -a` | | **Agent Mode** (Deep analysis & Impact check) |
 | `git-ai -y` | | Skip confirmation and commit directly |
 | `git-ai -n 3` | | Generate 3 options to choose from |
 | `git-ai -l en` | | Force language (en/zh) |
