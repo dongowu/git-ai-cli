@@ -17,6 +17,7 @@ Process:
 Rules:
 - Focus on core logic and ignore large auto-generated files.
 - The output format of the final message must be: <type>(<scope>): <subject> (and optional body).
+- **DO NOT** use markdown code blocks (like \`\`\`). Just return the raw commit message text.
 - Reply with just the commit message when you are done.
 `;
 
@@ -129,7 +130,11 @@ Please analyze these changes. If you detect breaking changes, search for usages 
       // Case 2: Final Content
       if (message.content) {
         if (spinner) spinner.stop();
-        return message.content.trim();
+        // Clean up markdown code blocks if present
+        return message.content
+          .replace(/^```[a-z]*\n/i, '') // Remove opening ```git/bash/text
+          .replace(/```$/, '')          // Remove closing ```
+          .trim();
       }
 
     } catch (error) {
