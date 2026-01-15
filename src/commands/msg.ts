@@ -86,6 +86,7 @@ export async function runMsg(options: MsgOptions = {}): Promise<void> {
     truncated,
     branchName,
     recentCommits,
+    quiet: options.quiet,
   };
 
   // Generate message(s)
