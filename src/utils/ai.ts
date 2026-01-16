@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import type { AIConfig } from '../types.js';
 import { runAgentLoop } from './agent.js';
+import { runAgentLite } from './agent_lite.js';
 import { getFileStats } from './git.js';
 import chalk from 'chalk';
 
@@ -18,6 +19,25 @@ function getMaxOutputTokens(numChoices: number): number {
   return base * Math.max(numChoices, 1);
 }
 
+function redactSecrets(input: string): string {
+  if (!input) return input;
+
+  // Generic "api key: xxxx" patterns.
+  let out = input.replace(/(api[_ -]?key\s*[:=]\s*)([^\s,;]+)/gi, (_m, p1, p2) => {
+    const s = String(p2);
+    if (s.length <= 8) return `${p1}********`;
+    return `${p1}${s.slice(0, 2)}****${s.slice(-2)}`;
+  });
+
+  // Common OpenAI-style keys: sk-...
+  out = out.replace(/\bsk-[A-Za-z0-9]{8,}\b/g, (m) => `${m.slice(0, 4)}****${m.slice(-2)}`);
+
+  // Avoid leaking long tokens in error messages.
+  out = out.replace(/\b[A-Za-z0-9_-]{24,}\b/g, (m) => `${m.slice(0, 3)}****${m.slice(-3)}`);
+
+  return out;
+}
+
 function formatAgentFailureReason(error: unknown): string {
   const err = error as any;
   const status = typeof err?.status === 'number' ? String(err.status) : '';
@@ -30,21 +50,34 @@ function formatAgentFailureReason(error: unknown): string {
     (typeof err?.message === 'string' && err.message) ||
     '';
 
-  const compactMsg = rawMsg.replace(/\s+/g, ' ').trim();
+  const compactMsg = redactSecrets(rawMsg).replace(/\s+/g, ' ').trim();
   const shortMsg = compactMsg.length > 180 ? compactMsg.slice(0, 180) + '...' : compactMsg;
 
   const parts = [status || name, code, type, shortMsg].filter(Boolean);
   return parts.join(' ');
 }
 
-function resolveAgentModel(config: AIConfig): string {
+type AgentStrategy = 'lite' | 'tools';
+
+function resolveAgentStrategy(_config: AIConfig): AgentStrategy {
+  const raw = (process.env.GIT_AI_AGENT_STRATEGY || '').trim().toLowerCase();
+  if (raw === 'tools' || raw === 'tool' || raw === 'function' || raw === 'functions') return 'tools';
+  if (raw === 'lite' || raw === 'local' || raw === 'fast') return 'lite';
+
+  // Default: lite (fewer API calls, works for providers without tool calling).
+  // Users can opt-in to tool calling with GIT_AI_AGENT_STRATEGY=tools.
+  return 'lite';
+}
+
+function resolveAgentModel(config: AIConfig, strategy: AgentStrategy): string {
   const envModel = process.env.GIT_AI_AGENT_MODEL;
   if (envModel && envModel.trim()) return envModel.trim();
 
   const configured = config.agentModel;
   if (configured && configured.trim()) return configured.trim();
 
-  if (config.provider === 'deepseek') {
+  // DeepSeek reasoner models are often not tool-capable; switch to a tool-capable model only when needed.
+  if (strategy === 'tools' && config.provider === 'deepseek') {
     const base = (config.model || '').trim();
     if (base.toLowerCase().includes('reasoner')) {
       return 'deepseek-chat';
@@ -52,6 +85,42 @@ function resolveAgentModel(config: AIConfig): string {
   }
 
   return config.model;
+}
+
+function normalizeAIError(error: unknown): Error {
+  if (error instanceof Error) {
+    const safe = redactSecrets(error.message || '');
+    const e = new Error(safe);
+    (e as any).cause = error;
+    return e;
+  }
+  return new Error(redactSecrets(String(error)));
+}
+
+function shouldFallbackFromAgent(error: unknown): boolean {
+  const err = error as any;
+  const status = typeof err?.status === 'number' ? err.status : undefined;
+  const type = typeof err?.type === 'string' ? err.type : '';
+
+  // If auth/endpoint is wrong, basic mode will fail too: don't spam the user with a second failure.
+  if (status === 401 || status === 403 || type === 'authentication_error') return false;
+  if (status === 404) return false;
+
+  // Rate limits / transient errors: agent uses more calls; basic mode may succeed.
+  if (status === 429) return true;
+  if (status && status >= 500) return true;
+
+  const msg =
+    (typeof err?.error?.message === 'string' && err.error.message) ||
+    (typeof err?.message === 'string' && err.message) ||
+    '';
+  const lowered = String(msg).toLowerCase();
+
+  // Tool calling compatibility issues: fall back to basic mode.
+  if (lowered.includes('tool') || lowered.includes('tool_choice') || lowered.includes('function')) return true;
+
+  // Default: keep previous behavior (fallback), unless it's clearly an auth/endpoint issue.
+  return true;
 }
 
 const DEFAULT_SYSTEM_PROMPT_EN = `You are an expert at writing Git commit messages following the Conventional Commits specification.
@@ -165,8 +234,9 @@ export async function generateCommitMessage(
   // Auto-enable Agent for critical branches in Git Flow
   // Critical: release/hotfix/master/main - always use Agent
   // Feature: feature/*/bugfix/*/dev/* - use Agent for impact analysis
-  const isCriticalBranch = /^(release|hotfix|master|main)$/.test(input.branchName || '');
-  const isFeatureBranch = /^(feature|bugfix|dev)\//.test(input.branchName || '');
+  const branch = input.branchName || '';
+  const isCriticalBranch = /^(release|hotfix)\//.test(branch) || /^(master|main)$/.test(branch);
+  const isFeatureBranch = /^(feature|bugfix|dev)\//.test(branch);
   const shouldRunAgent = (input.truncated || input.forceAgent || isCriticalBranch || isFeatureBranch) && numChoices === 1;
 
   // Trigger Agent Mode if diff is truncated OR forced by user OR critical branch
@@ -174,21 +244,29 @@ export async function generateCommitMessage(
     try {
       const stats = await getFileStats();
       if (stats.length > 0) {
-        const agentModel = resolveAgentModel(config);
-        if (!input.quiet && agentModel !== config.model) {
-          console.log(chalk.gray(`\n🧠 Agent model: ${agentModel} (base model: ${config.model})`));
+        const agentStrategy = resolveAgentStrategy(config);
+        const agentModel = resolveAgentModel(config, agentStrategy);
+        if (!input.quiet) {
+          const label = agentStrategy === 'tools' ? 'tools' : 'lite';
+          if (agentModel !== config.model) {
+            console.log(
+              chalk.gray(`\n🧠 Agent (${label}) model: ${agentModel} (base model: ${config.model})`)
+            );
+          } else {
+            console.log(chalk.gray(`\n🧠 Agent strategy: ${label}`));
+          }
         }
-        const agentMessage = await runAgentLoop(
-          client,
-          config,
-          stats,
-          input.branchName,
-          input.quiet,
-          agentModel
-        );
+
+        const agentMessage =
+          agentStrategy === 'tools'
+            ? await runAgentLoop(client, config, stats, input.branchName, input.quiet, agentModel)
+            : await runAgentLite(client, config, stats, input.branchName, input.quiet, agentModel);
         return [agentMessage];
       }
     } catch (error) {
+      if (!shouldFallbackFromAgent(error)) {
+        throw normalizeAIError(error);
+      }
       if (!input.quiet) {
         const reason = formatAgentFailureReason(error);
         const suffix = reason ? ` (${reason})` : '';

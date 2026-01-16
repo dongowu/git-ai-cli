@@ -57,7 +57,7 @@ git-ai
 
 ### 3. 🤖 Agent 智能体 (New)
 从单纯的“文本生成”进化为“智能代码专家”。
-- **Smart Diff**: 遇到超大变更不再瞎编。Agent 会自动分析统计数据，只读取核心文件的代码，彻底解决 Token 限制问题。
+- **Smart Diff**: 遇到超大变更不再瞎编。Agent 会自动分析统计数据，只读取核心文件的代码，大幅降低 Token 限制带来的影响。
 - **影响分析 (Impact Analysis)**: 修改了核心 API？Agent 会主动**搜索整个代码库**（`git grep`），检查调用方是否同步修改，并在 Commit Body 中提示潜在风险。
 - **Git Flow 护航**: 在 `release/*` 或 `hotfix/*` 分支上自动开启深度检查，守卫生产环境。
 
@@ -82,12 +82,50 @@ git-ai
 
 ```json
 {
-  "model": "deepseek-coder",
-  "temperature": 0.5,
-  "locale": "zh-CN",
-  "customPrompt": "Always start with an emoji."
+  "provider": "deepseek",
+  "baseUrl": "https://api.deepseek.com/v1",
+  "model": "deepseek-reasoner",
+  "agentModel": "deepseek-chat",
+  "locale": "zh",
+  "enableFooter": true
 }
 ```
+
+说明：
+- `model`：基础模式生成提交信息的模型
+- `agentModel`：Agent 模式（`-a`）专用模型（建议选择稳定支持 tools 的模型；DeepSeek 常用 `deepseek-chat`）
+- `locale`：仅支持 `zh` / `en`
+- `apiKey` 建议通过环境变量或全局配置设置，不要提交到仓库
+
+### 命令行配置（可脚本化）
+
+```bash
+# 查看当前生效配置（包含环境变量覆盖）
+git-ai config get --json
+
+# 设置全局配置（写入全局配置文件）
+git-ai config set model deepseek-chat
+
+# 设置项目级配置（写入当前项目 .git-ai.json）
+git-ai config set agentModel deepseek-chat --local
+
+# 查看可配置项 / 环境变量覆盖
+git-ai config describe
+```
+
+### 环境变量（CI/脚本）
+
+常用环境变量（优先级高于配置文件）：
+- `GIT_AI_PROVIDER` / `GIT_AI_BASE_URL` / `GIT_AI_MODEL` / `GIT_AI_AGENT_MODEL`
+- `GIT_AI_API_KEY`（也支持 `DEEPSEEK_API_KEY`、`OPENAI_API_KEY`）
+- `GIT_AI_TIMEOUT_MS`（请求超时，默认 120000）
+- `GIT_AI_MAX_DIFF_CHARS`（控制 diff 截断长度）
+- `GIT_AI_MAX_OUTPUT_TOKENS`（控制输出 token 上限）
+- `GIT_AI_DEBUG=1`（打印更详细错误）
+
+OpenCommit 兼容变量（可直接复用）：
+- `OCO_AI_PROVIDER` / `OCO_MODEL` / `OCO_API_KEY`
+- `OCO_TOKENS_MAX_INPUT` / `OCO_TOKENS_MAX_OUTPUT`
 
 ### 忽略文件 `.git-aiignore`
 在项目根目录创建，用于排除不想发送给 AI 的文件（语法同 `.gitignore`）：
@@ -97,6 +135,21 @@ package-lock.json
 dist/
 *.min.js
 ```
+
+同时兼容 OpenCommit 的 `.opencommitignore`（两者都会读取）。
+
+### 常见问题
+
+**1) 401 / API Key 无效**
+- 先看生效配置：`git-ai config get --json --local`
+- 再检查环境变量是否覆盖：`GIT_AI_API_KEY / DEEPSEEK_API_KEY / OPENAI_API_KEY / OCO_API_KEY`
+
+**2) Diff 被截断**
+- 通过 `.git-aiignore` / `.opencommitignore` 忽略大文件（lock/build/map）
+- 或设置 `GIT_AI_MAX_DIFF_CHARS`（也兼容 `OCO_TOKENS_MAX_INPUT`）
+
+**3) Agent 自动回退到基础模式**
+- 设置 `GIT_AI_DEBUG=1` 可以看到回退原因（超时/限流/鉴权等）
 
 ---
 
@@ -148,10 +201,14 @@ git-ai report --days 30
 | 命令 | 别名 | 说明 |
 |------|------|------|
 | `git-ai init` | `config` | **初始化配置**（设置模型、Key、语言） |
+| `git-ai config get` | | 查看当前生效配置（支持 `--json` / `--local`） |
+| `git-ai config set <key> <value>` | | 设置配置（支持 `--local` / `--json`） |
+| `git-ai config describe` | | 查看可配置项与环境变量覆盖 |
 | `git-ai` | | 交互式生成并提交 |
 | `git-ai -a` | | **Agent 模式** (深度分析 & 影响检查) |
 | `git-ai -y` | | 跳过确认直接提交 |
 | `git-ai -n 3` | | 生成 3 条候选消息 |
+| `git-ai -l en` | | 强制输出语言（en/zh） |
 | `git-ai hook install` | | **安装 Git Hook** (支持 `--global`) |
 | `git-ai hook remove` | | 移除 Git Hook |
 | `git-ai report` | | **生成 AI 周报** (支持 `--days`) |

@@ -57,7 +57,7 @@ git-ai
 
 ### 3. 🤖 Agent Intelligence (New)
 Evolving from a text generator to a code expert.
-- **Smart Diff**: No more truncated diffs. The Agent automatically analyzes file stats and reads only the critical source code, solving token limits for large refactors.
+- **Smart Diff**: The Agent analyzes file stats and reads only the critical diffs to reduce truncation and token usage on large refactors.
 - **Impact Analysis**: Changing a core API? The Agent proactively searches your codebase (`git grep`) to find usages and warns you about potential breaking changes in the commit body.
 - **Git Flow Guard**: Automatically enables deep analysis on `release/*` or `hotfix/*` branches to protect production code.
 
@@ -82,12 +82,50 @@ Create this file in your project root to override global settings:
 
 ```json
 {
-  "model": "deepseek-coder",
-  "temperature": 0.5,
+  "provider": "deepseek",
+  "baseUrl": "https://api.deepseek.com/v1",
+  "model": "deepseek-reasoner",
+  "agentModel": "deepseek-chat",
   "locale": "en",
-  "customPrompt": "Always start with an emoji."
+  "enableFooter": true
 }
 ```
+
+Notes:
+- `model`: base generation model
+- `agentModel`: Agent mode (`-a`) model (pick a tool-capable model; DeepSeek typically uses `deepseek-chat`)
+- `locale`: only `zh` / `en`
+- It's recommended to set `apiKey` via env vars or global config (don't commit keys into the repo)
+
+### CLI Config (scriptable)
+
+```bash
+# Show effective config (includes env overrides)
+git-ai config get --json
+
+# Set global config
+git-ai config set model deepseek-chat
+
+# Set per-project config (write to .git-ai.json)
+git-ai config set agentModel deepseek-chat --local
+
+# List keys + env overrides
+git-ai config describe
+```
+
+### Environment Variables (CI/Scripts)
+
+Common env overrides (higher priority than config files):
+- `GIT_AI_PROVIDER` / `GIT_AI_BASE_URL` / `GIT_AI_MODEL` / `GIT_AI_AGENT_MODEL`
+- `GIT_AI_API_KEY` (also supports `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`)
+- `GIT_AI_TIMEOUT_MS` (request timeout, default 120000)
+- `GIT_AI_MAX_DIFF_CHARS` (diff truncation length)
+- `GIT_AI_MAX_OUTPUT_TOKENS` (output token limit)
+- `GIT_AI_DEBUG=1` (print more error details)
+
+OpenCommit-compatible env vars:
+- `OCO_AI_PROVIDER` / `OCO_MODEL` / `OCO_API_KEY`
+- `OCO_TOKENS_MAX_INPUT` / `OCO_TOKENS_MAX_OUTPUT`
 
 ### Ignore File `.git-aiignore`
 Exclude specific files from AI analysis (syntax similar to `.gitignore`):
@@ -97,6 +135,21 @@ package-lock.json
 dist/
 *.min.js
 ```
+
+Also compatible with OpenCommit's `.opencommitignore` (both will be read).
+
+### Troubleshooting
+
+**1) 401 / Invalid API key**
+- Check effective config: `git-ai config get --json --local`
+- Make sure env vars aren't overriding your key: `GIT_AI_API_KEY / DEEPSEEK_API_KEY / OPENAI_API_KEY / OCO_API_KEY`
+
+**2) Diff truncated**
+- Ignore large files via `.git-aiignore` / `.opencommitignore`
+- Or set `GIT_AI_MAX_DIFF_CHARS` (also supports `OCO_TOKENS_MAX_INPUT`)
+
+**3) Agent falls back to basic mode**
+- Set `GIT_AI_DEBUG=1` to see the real failure reason (timeout/rate limit/auth, etc.)
 
 ---
 
@@ -145,6 +198,9 @@ git-ai report --days 30
 | Command | Alias | Description |
 |---------|-------|-------------|
 | `git-ai init` | `config` | **Initialize Config** (Provider, Key, Language) |
+| `git-ai config get` | | Show effective config (supports `--json` / `--local`) |
+| `git-ai config set <key> <value>` | | Set config (supports `--local` / `--json`) |
+| `git-ai config describe` | | List config keys and env overrides |
 | `git-ai` | | Interactive generation & commit |
 | `git-ai -a` | | **Agent Mode** (Deep analysis & Impact check) |
 | `git-ai -y` | | Skip confirmation and commit directly |

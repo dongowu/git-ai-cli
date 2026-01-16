@@ -73,8 +73,8 @@ function getEnvConfig(baseProvider?: string): Partial<AIConfig> {
   const apiKey =
     process.env.GIT_AI_API_KEY ||
     process.env.OCO_API_KEY ||
-    process.env.OPENAI_API_KEY ||
-    (inferredProvider === 'deepseek' ? process.env.DEEPSEEK_API_KEY : undefined);
+    (inferredProvider === 'deepseek' ? process.env.DEEPSEEK_API_KEY : undefined) ||
+    (inferredProvider === 'openai' ? process.env.OPENAI_API_KEY : undefined);
   if (apiKey) env.apiKey = apiKey;
 
   const baseUrl = process.env.GIT_AI_BASE_URL;
