@@ -71,7 +71,7 @@ function analyzeFileImportance(stats: FileStat[]): { priority: FileStat[], other
     const score = stat.insertions + stat.deletions;
     accumulated += score;
 
-    if (accumulated < totalLines * 0.8 && priority.length < 8) {
+    if (accumulated < totalLines * 0.8 && priority.length < 5) {
       priority.push(stat);
     }
   }
@@ -177,7 +177,8 @@ Based on the above information, generate a commit message. Use tools only if you
   let toolCalls = 0;
   let forceFinal = false;
   let toolBudgetNotified = false;
-  const MAX_ITERATIONS = 4;
+  let firstRound = true;
+  const MAX_ITERATIONS = 5;
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     try {
@@ -185,10 +186,11 @@ Based on the above information, generate a commit message. Use tools only if you
         model: modelOverride || config.model,
         messages,
         tools,
-        tool_choice: forceFinal ? 'none' : undefined,
+        tool_choice: firstRound ? 'none' : (forceFinal ? 'none' : undefined),
         temperature: 0.3,
       });
 
+      firstRound = false;
       const message = response.choices[0]?.message;
 
       if (!message) {
