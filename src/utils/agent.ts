@@ -79,6 +79,34 @@ function analyzeFileImportance(stats: FileStat[]): { priority: FileStat[], other
   return { priority, others: sorted.slice(priority.length) };
 }
 
+function extractScopeFromBranch(branchName: string): string | null {
+  if (!branchName) return null;
+
+  const patterns = [
+    /^(?:feature|bugfix|hotfix|release|dev)\/([a-zA-Z0-9_-]+)/,
+    /^(?:feat|fix|chore|docs)\/([a-zA-Z0-9_-]+)/,
+    /^[A-Z]+-\d+/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = branchName.match(pattern);
+    if (match) {
+      return match[1].toLowerCase().replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+    }
+  }
+  return null;
+}
+
+function getBranchWarning(branchName: string): string {
+  if (/^hotfix\//.test(branchName)) {
+    return '\n⚠️  WARNING: This is a HOTFIX branch. Changes will be deployed immediately. Ensure all tests pass.';
+  }
+  if (/^release\//.test(branchName)) {
+    return '\n⚠️  WARNING: This is a RELEASE branch. Review changes carefully before committing.';
+  }
+  return '';
+}
+
 const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: 'function',
@@ -155,8 +183,11 @@ export async function runAgentLoop(
   ).join('\n\n');
 
   const otherFiles = others.filter(s => !isBlacklisted(s.file)).map(s => s.file);
+  const scope = extractScopeFromBranch(branchName || '');
+  const warning = getBranchWarning(branchName || '');
 
-  const initialContent = `Current Branch: ${branchName || 'unknown'}
+  const initialContent = `Current Branch: ${branchName || 'unknown'}${warning}
+${scope ? `Inferred scope from branch: ${scope}` : ''}
 
 Files Summary (priority order):
 ${stats.slice(0, 15).map((s) => `${s.file} (+${s.insertions}, -${s.deletions})`).join('\n')}

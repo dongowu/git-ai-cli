@@ -156,8 +156,11 @@ export async function generateCommitMessage(
   };
 
   // Auto-enable Agent for critical branches in Git Flow
-  const isCriticalBranch = input.branchName && /^(release|hotfix|master|main)/.test(input.branchName);
-  const shouldRunAgent = (input.truncated || input.forceAgent || isCriticalBranch) && numChoices === 1;
+  // Critical: release/hotfix/master/main - always use Agent
+  // Feature: feature/*/bugfix/*/dev/* - use Agent for impact analysis
+  const isCriticalBranch = /^(release|hotfix|master|main)$/.test(input.branchName || '');
+  const isFeatureBranch = /^(feature|bugfix|dev)\//.test(input.branchName || '');
+  const shouldRunAgent = (input.truncated || input.forceAgent || isCriticalBranch || isFeatureBranch) && numChoices === 1;
 
   // Trigger Agent Mode if diff is truncated OR forced by user OR critical branch
   if (shouldRunAgent) {
