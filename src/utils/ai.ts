@@ -79,7 +79,8 @@ export function createAIClient(config: AIConfig): OpenAI {
 }
 
 export interface CommitMessageGenerationInput {
-  diff: string;
+  diff?: string;
+  diffLoader?: () => Promise<{ diff: string; truncated: boolean; ignoredFiles: string[] }>;
   stagedFiles?: string[];
   ignoredFiles?: string[];
   truncated?: boolean;
@@ -95,6 +96,22 @@ export async function generateCommitMessage(
   config: AIConfig,
   numChoices = 1
 ): Promise<string[]> {
+  let diff = input.diff;
+  let ignoredFiles = input.ignoredFiles;
+  let truncated = input.truncated;
+
+  const ensureDiff = async (): Promise<void> => {
+    if (diff !== undefined) return;
+    if (input.diffLoader) {
+      const loaded = await input.diffLoader();
+      diff = loaded.diff;
+      truncated = loaded.truncated;
+      ignoredFiles = loaded.ignoredFiles;
+      return;
+    }
+    diff = '';
+  };
+
   // Auto-enable Agent for critical branches in Git Flow
   const isCriticalBranch = input.branchName && /^(release|hotfix|master|main)/.test(input.branchName);
   const shouldRunAgent = (input.truncated || input.forceAgent || isCriticalBranch) && numChoices === 1;
@@ -113,6 +130,8 @@ export async function generateCommitMessage(
       }
     }
   }
+
+  await ensureDiff();
 
   let systemPrompt = config.customPrompt;
 
@@ -165,14 +184,14 @@ export async function generateCommitMessage(
     lines.push(`${header}\n${input.stagedFiles.map((f) => `- ${f}`).join('\n')}`);
   }
 
-  if (input.ignoredFiles?.length) {
+  if (ignoredFiles?.length) {
     const header = isZh
       ? '以下文件为节省 Token 已忽略 Diff:'
       : 'Ignored files (diff omitted for token optimization):';
-    lines.push(`${header}\n${input.ignoredFiles.map((f) => `- ${f}`).join('\n')}`);
+    lines.push(`${header}\n${ignoredFiles.map((f) => `- ${f}`).join('\n')}`);
   }
 
-  if (input.truncated) {
+  if (truncated) {
     lines.push(
       isZh
         ? '注意：Diff 内容已因长度限制被截断。'
@@ -181,7 +200,7 @@ export async function generateCommitMessage(
   }
 
   const diffHeader = isZh ? 'Git Diff:' : 'Git diff:';
-  lines.push(`${diffHeader}\n\n${input.diff || '(empty)'}`);
+  lines.push(`${diffHeader}\n\n${diff || '(empty)'}`);
 
   const response = await client.chat.completions.create({
     model: config.model,

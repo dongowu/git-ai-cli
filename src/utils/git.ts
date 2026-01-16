@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { DIFF_BLACKLIST, MAX_DIFF_LENGTH } from '../types.js';
 
 let cachedIgnorePatterns: string[] | null = null;
+const MAX_SEARCH_RESULTS = 50;
+const MAX_SEARCH_OUTPUT_CHARS = 4000;
 
 function getIgnorePatterns(): string[] {
   if (cachedIgnorePatterns) return cachedIgnorePatterns;
@@ -213,8 +215,23 @@ export async function getRecentCommits(days: number): Promise<string[]> {
 export async function searchCode(pattern: string): Promise<string> {
   try {
     // Use git grep to search in tracked files (it's faster and respects .gitignore)
-    const { stdout } = await execa('git', ['grep', '-n', '--max-depth=3', pattern]);
-    return stdout;
+    const { stdout } = await execa('git', ['grep', '-n', '-e', pattern]);
+    if (!stdout) return 'No matches found.';
+
+    const lines = stdout.split('\n').filter(Boolean);
+    let output = lines.join('\n');
+
+    if (lines.length > MAX_SEARCH_RESULTS) {
+      output =
+        lines.slice(0, MAX_SEARCH_RESULTS).join('\n') +
+        `\n...[${lines.length - MAX_SEARCH_RESULTS} more matches]`;
+    }
+
+    if (output.length > MAX_SEARCH_OUTPUT_CHARS) {
+      output = output.slice(0, MAX_SEARCH_OUTPUT_CHARS) + '\n...[Search output truncated]';
+    }
+
+    return output;
   } catch {
     return 'No matches found.';
   }
