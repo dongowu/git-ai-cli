@@ -20,6 +20,7 @@ import { cac } from 'cac';
 import chalk from 'chalk';
 import { createRequire } from 'node:module';
 import { runConfig } from './commands/config.js';
+import { runConfigDescribe, runConfigGet, runConfigSet } from './commands/config_manage.js';
 import { runCommit } from './commands/commit.js';
 import { runMsg } from './commands/msg.js';
 import { runHook } from './commands/hook.js';
@@ -110,18 +111,50 @@ cli
   });
 
 cli
-  .command('config', 'Configure AI provider settings')
+  .command('config [action] [key] [value]', 'Configure AI provider settings')
   .alias('init')
-  .action(async () => {
-    try {
-      await runConfig();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      console.error(chalk.red(`\n❌ Error: ${message}\n`));
-      process.exit(1);
-    }
-  });
+  .option('--json', 'Output as JSON (for get/set/describe)')
+  .option('--local', 'Use local .git-ai.json (for get/set)')
+  .action(
+    async (
+      action?: string,
+      key?: string,
+      value?: string,
+      options?: { json?: boolean; local?: boolean }
+    ) => {
+      try {
+        const act = (action || '').trim();
+        if (!act) {
+          await runConfig();
+          return;
+        }
 
+        if (act === 'get') {
+          runConfigGet({ json: options?.json, local: options?.local });
+          return;
+        }
+
+        if (act === 'describe') {
+          runConfigDescribe({ json: options?.json });
+          return;
+        }
+
+        if (act === 'set') {
+          if (!key || value === undefined) {
+            throw new Error('Usage: git-ai config set <key> <value>');
+          }
+          runConfigSet(key, value, { json: options?.json, local: options?.local });
+          return;
+        }
+
+        throw new Error(`Unknown config action: ${act}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.error(chalk.red(`\n? Error: ${message}\n`));
+        process.exit(1);
+      }
+    }
+  );
 cli
   .command('hook <action>', 'Manage Git hooks (install/remove/status)')
   .option('-g, --global', 'Apply to global Git hooks (all repositories)')
@@ -155,3 +188,4 @@ cli.version(pkg.version || '0.0.0');
 checkUpdate().then(() => {
   cli.parse();
 });
+

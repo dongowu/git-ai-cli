@@ -7,13 +7,31 @@ let cachedIgnorePatterns: string[] | null = null;
 const MAX_SEARCH_RESULTS = 50;
 const MAX_SEARCH_OUTPUT_CHARS = 4000;
 
+function getMaxDiffLengthChars(): number {
+  const rawChars = process.env.GIT_AI_MAX_DIFF_CHARS;
+  const parsedChars = rawChars ? Number.parseInt(rawChars, 10) : Number.NaN;
+  if (Number.isFinite(parsedChars) && parsedChars > 0) return parsedChars;
+
+  // OpenCommit compatibility: approximate tokens -> chars (roughly 4 chars per token).
+  const rawTokens = process.env.OCO_TOKENS_MAX_INPUT;
+  const parsedTokens = rawTokens ? Number.parseInt(rawTokens, 10) : Number.NaN;
+  if (Number.isFinite(parsedTokens) && parsedTokens > 0) return parsedTokens * 4;
+
+  return MAX_DIFF_LENGTH;
+}
+
 function getIgnorePatterns(): string[] {
   if (cachedIgnorePatterns) return cachedIgnorePatterns;
 
   const patterns = [...DIFF_BLACKLIST];
-  const ignorePath = join(process.cwd(), '.git-aiignore');
+  const ignorePaths = [
+    join(process.cwd(), '.git-aiignore'),
+    // OpenCommit compatibility
+    join(process.cwd(), '.opencommitignore'),
+  ];
 
-  if (existsSync(ignorePath)) {
+  for (const ignorePath of ignorePaths) {
+    if (!existsSync(ignorePath)) continue;
     try {
       const content = readFileSync(ignorePath, 'utf-8');
       const lines = content
@@ -169,8 +187,9 @@ export async function getFilteredDiff(
   let fullDiff = diffParts.join('\n');
   let truncated = false;
 
-  if (fullDiff.length > MAX_DIFF_LENGTH) {
-    fullDiff = fullDiff.slice(0, MAX_DIFF_LENGTH) + '\n\n...[Diff Truncated]';
+  const maxLen = getMaxDiffLengthChars();
+  if (fullDiff.length > maxLen) {
+    fullDiff = fullDiff.slice(0, maxLen) + '\n\n...[Diff Truncated]';
     truncated = true;
   }
 
