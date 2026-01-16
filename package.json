@@ -1,6 +1,6 @@
 {
   "name": "@dongowu/git-ai-cli",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "Fast, privacy-first, bring-your-own-model Git commit message generator",
   "type": "module",
   "main": "dist/cli.js",
