@@ -11,6 +11,13 @@ function getTimeoutMs(): number {
   return 120_000; // 2 minutes
 }
 
+function getMaxOutputTokens(numChoices: number): number {
+  const raw = process.env.GIT_AI_MAX_OUTPUT_TOKENS || process.env.OCO_TOKENS_MAX_OUTPUT;
+  const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+  const base = Number.isFinite(parsed) && parsed > 0 ? parsed : 500;
+  return base * Math.max(numChoices, 1);
+}
+
 function formatAgentFailureReason(error: unknown): string {
   const err = error as any;
   const status = typeof err?.status === 'number' ? String(err.status) : '';
@@ -271,7 +278,7 @@ export async function generateCommitMessage(
       { role: 'user', content: lines.join('\n\n') },
     ],
     temperature: 0.7,
-    max_tokens: 500 * numChoices, // Increase token limit for multiple choices
+    max_tokens: getMaxOutputTokens(numChoices),
   });
 
   const content = response.choices[0]?.message?.content?.trim();
