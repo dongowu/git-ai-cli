@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { getFileDiff, getFileStats, FileStat, searchCode } from './git.js';
+import { getFileDiff, getFileStats, FileStat, isBlacklisted, searchCode } from './git.js';
 import { AIConfig } from '../types.js';
 import chalk from 'chalk';
 import ora from 'ora';
@@ -20,6 +20,15 @@ Rules:
 - **DO NOT** use markdown code blocks (like \`\`\`). Just return the raw commit message text.
 - Reply with just the commit message when you are done.
 `;
+
+const MAX_TOOL_CALLS = 6;
+const MAX_TOOL_DIFF_CHARS = 4000;
+const MAX_TOOL_SEARCH_CHARS = 4000;
+
+function truncateText(text: string, maxChars: number, suffix: string): string {
+  if (text.length <= maxChars) return text;
+  return text.slice(0, maxChars) + suffix;
+}
 
 const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -81,6 +90,11 @@ Please analyze these changes. If you detect breaking changes, search for usages 
   const spinner = !quiet ? ora('Agent is analyzing file stats...').start() : null;
   let iterations = 0;
   const MAX_ITERATIONS = 5;
+  const diffCache = new Map<string, string>();
+  const searchCache = new Map<string, string>();
+  let toolCalls = 0;
+  let forceFinal = false;
+  let toolBudgetNotified = false;
 
   while (iterations < MAX_ITERATIONS) {
     try {
@@ -88,7 +102,7 @@ Please analyze these changes. If you detect breaking changes, search for usages 
         model: config.model,
         messages,
         tools,
-        tool_choice: 'auto',
+        tool_choice: forceFinal ? 'none' : 'auto',
         temperature: 0.2,
       });
 
@@ -103,25 +117,90 @@ Please analyze these changes. If you detect breaking changes, search for usages 
       // Case 1: Tool Calls
       if (message.tool_calls?.length) {
         for (const toolCall of message.tool_calls) {
+          const canUseTool = toolCalls < MAX_TOOL_CALLS;
+
           if (toolCall.function.name === 'get_file_diff') {
             if (spinner) spinner.text = `Agent is inspecting diffs...`;
-            const args = JSON.parse(toolCall.function.arguments);
-            const diffContent = await getFileDiff(args.path);
+            let content = '(No diff)';
+
+            if (!canUseTool) {
+              forceFinal = true;
+              content = '(Tool budget exceeded. Return final commit message.)';
+            } else {
+              let path = '';
+              try {
+                const args = JSON.parse(toolCall.function.arguments || '{}');
+                path = typeof args.path === 'string' ? args.path : '';
+              } catch {
+                path = '';
+              }
+
+              if (!path) {
+                content = '(Invalid file path)';
+              } else if (isBlacklisted(path)) {
+                content = '(Diff skipped: ignored file)';
+              } else if (diffCache.has(path)) {
+                content = diffCache.get(path) || '(No diff)';
+              } else {
+                const diffContent = await getFileDiff(path);
+                content = diffContent || '(No diff)';
+                content = truncateText(content, MAX_TOOL_DIFF_CHARS, '\n...[Diff truncated]');
+                diffCache.set(path, content);
+              }
+              toolCalls++;
+            }
+
             messages.push({
               role: 'tool',
               tool_call_id: toolCall.id,
-              content: diffContent || '(No diff)',
+              content,
             });
           } else if (toolCall.function.name === 'search_code') {
             if (spinner) spinner.text = `Agent is searching codebase...`;
-            const args = JSON.parse(toolCall.function.arguments);
-            const searchResult = await searchCode(args.pattern);
+            let content = 'No matches found.';
+
+            if (!canUseTool) {
+              forceFinal = true;
+              content = '(Tool budget exceeded. Return final commit message.)';
+            } else {
+              let pattern = '';
+              try {
+                const args = JSON.parse(toolCall.function.arguments || '{}');
+                pattern = typeof args.pattern === 'string' ? args.pattern : '';
+              } catch {
+                pattern = '';
+              }
+
+              if (!pattern) {
+                content = '(Invalid search pattern)';
+              } else if (searchCache.has(pattern)) {
+                content = searchCache.get(pattern) || 'No matches found.';
+              } else {
+                const searchResult = await searchCode(pattern);
+                content = truncateText(
+                  searchResult || 'No matches found.',
+                  MAX_TOOL_SEARCH_CHARS,
+                  '\n...[Search output truncated]'
+                );
+                searchCache.set(pattern, content);
+              }
+              toolCalls++;
+            }
+
             messages.push({
               role: 'tool',
               tool_call_id: toolCall.id,
-              content: searchResult,
+              content,
             });
           }
+        }
+
+        if (forceFinal && !toolBudgetNotified) {
+          messages.push({
+            role: 'system',
+            content: 'Tool budget reached. Please return the final commit message now.',
+          });
+          toolBudgetNotified = true;
         }
         iterations++;
         continue;
@@ -144,5 +223,5 @@ Please analyze these changes. If you detect breaking changes, search for usages 
   }
 
   if (spinner) spinner.fail('Agent exceeded maximum iterations.');
-  return 'chore: commit (agent failed to converge)';
+  throw new Error('Agent exceeded maximum iterations.');
 }

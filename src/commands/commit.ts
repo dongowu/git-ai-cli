@@ -114,28 +114,53 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
       console.log(chalk.gray(`   ${file}`));
     });
   }
-
-  // Get filtered diff
-  const { diff, truncated, ignoredFiles } = await getFilteredDiff(stagedFiles);
   const branchName = await getBranchName();
   const recentCommits = await getRecentCommits(10); // Get last 10 commits for style reference
 
-  if (!hookMode) {
+  let diffCache: { diff: string; truncated: boolean; ignoredFiles: string[] } | null = null;
+  let diffInfoPrinted = false;
+
+  const maybePrintDiffInfo = (ignoredFiles: string[], truncated: boolean): void => {
+    if (hookMode || diffInfoPrinted) return;
     if (ignoredFiles.length > 0) {
       const preview = ignoredFiles.slice(0, 8).join(', ');
       const more = ignoredFiles.length > 8 ? ` (+${ignoredFiles.length - 8} more)` : '';
-      console.log(chalk.gray(`\n🧹 Ignored from diff (token optimization): ${preview}${more}`));
+      console.log(chalk.gray(`\n📦 Ignored from diff (token optimization): ${preview}${more}`));
     }
-
     if (truncated) {
       console.log(chalk.yellow('\n⚠️  Diff was truncated due to size limits.'));
     }
+    diffInfoPrinted = true;
+  };
+
+  const loadDiff = async (): Promise<{ diff: string; truncated: boolean; ignoredFiles: string[] }> => {
+    if (!diffCache) {
+      diffCache = await getFilteredDiff(stagedFiles);
+      maybePrintDiffInfo(diffCache.ignoredFiles, diffCache.truncated);
+    }
+    return diffCache;
+  };
+
+  const shouldLazyDiff = options.agentMode && numChoices === 1;
+  let diff: string | undefined;
+  let ignoredFiles: string[] | undefined;
+  let truncated: boolean | undefined;
+  let diffLoader: CommitMessageGenerationInput['diffLoader'] | undefined;
+
+  if (shouldLazyDiff) {
+    diffLoader = loadDiff;
+  } else {
+    const loaded = await loadDiff();
+    diff = loaded.diff;
+    ignoredFiles = loaded.ignoredFiles;
+    truncated = loaded.truncated;
   }
 
   // Create AI client
   const client = createAIClient(config);
   const input: CommitMessageGenerationInput = {
     diff,
+    diffLoader,
     stagedFiles,
     ignoredFiles,
     truncated,
@@ -314,3 +339,4 @@ async function performCommit(message: string): Promise<void> {
     exitWithError(errorMessage);
   }
 }
+
