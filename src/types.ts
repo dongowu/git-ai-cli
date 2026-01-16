@@ -3,6 +3,7 @@ export interface AIConfig {
   apiKey: string;
   baseUrl: string;
   model: string;
+  agentModel?: string;
   locale: 'zh' | 'en';
   customPrompt?: string;
   enableFooter?: boolean;

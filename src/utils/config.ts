@@ -22,6 +22,10 @@ const config = new Conf<AIConfig>({
       type: 'string',
       default: '',
     },
+    agentModel: {
+      type: 'string',
+      default: '',
+    },
     locale: {
       type: 'string',
       enum: ['zh', 'en'],
@@ -30,6 +34,10 @@ const config = new Conf<AIConfig>({
     customPrompt: {
       type: 'string',
       default: '',
+    },
+    enableFooter: {
+      type: 'boolean',
+      default: true,
     },
   },
 });
@@ -53,6 +61,7 @@ export function getConfig(): AIConfig | null {
     apiKey: config.get('apiKey'),
     baseUrl: config.get('baseUrl'),
     model: config.get('model'),
+    agentModel: config.get('agentModel'),
     locale: config.get('locale'),
     customPrompt: config.get('customPrompt'),
     enableFooter: config.get('enableFooter'),

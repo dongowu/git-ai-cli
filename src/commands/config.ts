@@ -93,6 +93,34 @@ export async function runConfig(): Promise<void> {
     model = answer.model;
   }
 
+  // Optional: separate model for Agent mode (tool calling)
+  const modelLower = model.trim().toLowerCase();
+  const suggestToolModel = provider === 'deepseek' && modelLower.includes('reasoner');
+
+  const { useAgentModel } = await inquirer.prompt<{ useAgentModel: boolean }>([
+    {
+      type: 'confirm',
+      name: 'useAgentModel',
+      message: suggestToolModel
+        ? 'Agent mode needs tool calling. Use a tool-capable model for Agent mode?'
+        : 'Use a separate model for Agent mode (tool calling)?',
+      default: suggestToolModel,
+    },
+  ]);
+
+  let agentModel = '';
+  if (useAgentModel) {
+    const agentAnswer = await inquirer.prompt<{ agentModel: string }>([
+      {
+        type: 'input',
+        name: 'agentModel',
+        message: 'Enter the Agent mode model name:',
+        default: suggestToolModel ? 'deepseek-chat' : model,
+      },
+    ]);
+    agentModel = agentAnswer.agentModel.trim();
+  }
+
   const { locale } = await inquirer.prompt<{ locale: 'zh' | 'en' }>([
     {
       type: 'list',
@@ -140,6 +168,7 @@ export async function runConfig(): Promise<void> {
     apiKey,
     baseUrl,
     model,
+    agentModel,
     locale,
     customPrompt,
     enableFooter,

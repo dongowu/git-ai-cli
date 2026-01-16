@@ -4,6 +4,49 @@ import { runAgentLoop } from './agent.js';
 import { getFileStats } from './git.js';
 import chalk from 'chalk';
 
+function getTimeoutMs(): number {
+  const raw = process.env.GIT_AI_TIMEOUT_MS;
+  const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  return 120_000; // 2 minutes
+}
+
+function formatAgentFailureReason(error: unknown): string {
+  const err = error as any;
+  const status = typeof err?.status === 'number' ? String(err.status) : '';
+  const name = typeof err?.name === 'string' ? err.name : '';
+  const code = typeof err?.code === 'string' ? err.code : '';
+  const type = typeof err?.type === 'string' ? err.type : '';
+
+  const rawMsg =
+    (typeof err?.error?.message === 'string' && err.error.message) ||
+    (typeof err?.message === 'string' && err.message) ||
+    '';
+
+  const compactMsg = rawMsg.replace(/\s+/g, ' ').trim();
+  const shortMsg = compactMsg.length > 180 ? compactMsg.slice(0, 180) + '...' : compactMsg;
+
+  const parts = [status || name, code, type, shortMsg].filter(Boolean);
+  return parts.join(' ');
+}
+
+function resolveAgentModel(config: AIConfig): string {
+  const envModel = process.env.GIT_AI_AGENT_MODEL;
+  if (envModel && envModel.trim()) return envModel.trim();
+
+  const configured = config.agentModel;
+  if (configured && configured.trim()) return configured.trim();
+
+  if (config.provider === 'deepseek') {
+    const base = (config.model || '').trim();
+    if (base.toLowerCase().includes('reasoner')) {
+      return 'deepseek-chat';
+    }
+  }
+
+  return config.model;
+}
+
 const DEFAULT_SYSTEM_PROMPT_EN = `You are an expert at writing Git commit messages following the Conventional Commits specification.
 
 Based on the git diff provided, generate a concise and descriptive commit message.
@@ -73,7 +116,7 @@ export function createAIClient(config: AIConfig): OpenAI {
   return new OpenAI({
     apiKey: config.apiKey || 'ollama',
     baseURL: config.baseUrl,
-    timeout: 30000, // 30 second timeout
+    timeout: getTimeoutMs(),
     maxRetries: 2,  // Built-in retry support
   });
 }
@@ -121,12 +164,28 @@ export async function generateCommitMessage(
     try {
       const stats = await getFileStats();
       if (stats.length > 0) {
-        const agentMessage = await runAgentLoop(client, config, stats, input.branchName, input.quiet);
+        const agentModel = resolveAgentModel(config);
+        if (!input.quiet && agentModel !== config.model) {
+          console.log(chalk.gray(`\n🧠 Agent model: ${agentModel} (base model: ${config.model})`));
+        }
+        const agentMessage = await runAgentLoop(
+          client,
+          config,
+          stats,
+          input.branchName,
+          input.quiet,
+          agentModel
+        );
         return [agentMessage];
       }
     } catch (error) {
       if (!input.quiet) {
-        console.error(chalk.yellow('\n⚠️  Agent mode failed, falling back to basic mode...'));
+        const reason = formatAgentFailureReason(error);
+        const suffix = reason ? ` (${reason})` : '';
+        console.error(chalk.yellow(`\n⚠️  Agent mode failed${suffix}, falling back to basic mode...`));
+        if (process.env.GIT_AI_DEBUG === '1') {
+          console.error(error);
+        }
       }
     }
   }
