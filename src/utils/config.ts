@@ -42,6 +42,12 @@ const config = new Conf<AIConfig>({
   },
 });
 
+let lastLocalConfigError: string | null = null;
+
+function getLocalConfigPath(): string {
+  return join(process.cwd(), '.git-ai.json');
+}
+
 function parseBooleanEnv(value: string | undefined): boolean | undefined {
   if (!value) return undefined;
   const normalized = value.trim().toLowerCase();
@@ -51,13 +57,15 @@ function parseBooleanEnv(value: string | undefined): boolean | undefined {
 }
 
 function getLocalConfig(): Partial<AIConfig> {
-  const localPath = join(process.cwd(), '.git-ai.json');
+  const localPath = getLocalConfigPath();
+  lastLocalConfigError = null;
   if (existsSync(localPath)) {
     try {
       const content = readFileSync(localPath, 'utf-8');
       return JSON.parse(content);
-    } catch {
-      // Ignore invalid config
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      lastLocalConfigError = message;
     }
   }
   return {};
@@ -126,6 +134,11 @@ export function getConfig(): AIConfig | null {
   }
 
   return finalConfig as AIConfig;
+}
+
+export function getLocalConfigError(): { path: string; error: string } | null {
+  if (!lastLocalConfigError) return null;
+  return { path: getLocalConfigPath(), error: lastLocalConfigError };
 }
 
 export function setConfig(newConfig: Partial<AIConfig>): void {

@@ -121,6 +121,13 @@ git-ai config describe
 - `GIT_AI_TIMEOUT_MS`（请求超时，默认 120000）
 - `GIT_AI_MAX_DIFF_CHARS`（控制 diff 截断长度）
 - `GIT_AI_MAX_OUTPUT_TOKENS`（控制输出 token 上限）
+- `GIT_AI_AUTO_AGENT=0`（关闭自动 Agent；仍可用 `-a` 强制开启）
+- `GIT_AI_DISABLE_AGENT=1`（完全禁用 Agent）
+- `GIT_AI_RECENT_COMMITS_ALL=1`（Recent Commits 不限制作者）
+- `GIT_AI_RECENT_COMMITS_FALLBACK=0`（禁用“无作者回退”）
+- `GIT_AI_DISABLE_UPDATE=1`（关闭更新检查）
+- `GIT_AI_UPDATE_INTERVAL_HOURS=24`（更新检查间隔，单位小时）
+- `GIT_AI_MSG_DELIM=<<<GIT_AI_END>>>`（`git-ai msg -n` 多候选分隔符）
 - `GIT_AI_DEBUG=1`（打印更详细错误）
 
 OpenCommit 兼容变量（可直接复用）：
@@ -192,6 +199,12 @@ git-ai report
 
 # 生成最近 30 天的汇报
 git-ai report --days 30
+
+# 指定日期范围
+git-ai report --from 2025-01-01 --to 2025-01-31
+
+# JSON 输出（便于脚本处理）
+git-ai report --days 7 --json
 ```
 
 ---
@@ -215,6 +228,8 @@ git-ai report --days 30
 | `git-ai msg` | | 仅输出消息（供脚本调用） |
 
 ---
+
+**提示**：`git-ai msg -n` 默认使用分隔符 `<<<GIT_AI_END>>>`；脚本场景建议使用 `--json`。
 
 ## 🤖 支持的模型
 

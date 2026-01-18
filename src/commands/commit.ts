@@ -1,7 +1,7 @@
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import ora from 'ora';
-import { getConfig } from '../utils/config.js';
+import { getConfig, getLocalConfigError } from '../utils/config.js';
 import {
   isGitInstalled,
   isInGitRepo,
@@ -10,7 +10,7 @@ import {
   commit,
   getBranchName,
   getRecentCommits,
-  getUnstagedFiles,
+  getUnstagedFileEntries,
   addFiles,
 } from '../utils/git.js';
 import {
@@ -65,24 +65,33 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
   
   if (stagedFiles.length === 0) {
     // Interactive add
-    const unstagedFiles = await getUnstagedFiles();
-    
-    if (unstagedFiles.length > 0 && !hookMode) {
+    const unstagedEntries = await getUnstagedFileEntries();
+
+    if (unstagedEntries.length > 0 && !hookMode) {
       console.log(chalk.yellow('⚠️  No staged changes found.'));
+      const allPaths = unstagedEntries.map((entry) => entry.path);
+      const choices = [
+        { name: '✅ Stage all files', value: '__ALL__' },
+        ...unstagedEntries.map((entry) => ({
+          name: `${entry.status.replace(/ /g, '.')} ${entry.path}`,
+          value: entry.path,
+        })),
+      ];
       const { selectedFiles } = await inquirer.prompt<{ selectedFiles: string[] }>([
         {
           type: 'checkbox',
           name: 'selectedFiles',
           message: 'Select files to stage:',
-          choices: unstagedFiles,
+          choices,
           pageSize: 15,
         },
       ]);
 
       if (selectedFiles.length > 0) {
-        await addFiles(selectedFiles);
+        const finalSelection = selectedFiles.includes('__ALL__') ? allPaths : selectedFiles;
+        await addFiles(finalSelection);
         stagedFiles = await getStagedFiles();
-        console.log(chalk.green(`✅ Staged ${selectedFiles.length} files.`));
+        console.log(chalk.green(`✅ Staged ${finalSelection.length} files.`));
       } else {
         console.log(chalk.gray('No files selected. Exiting.'));
         process.exit(0);
@@ -99,7 +108,17 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
   // Check config
   const config = getConfig();
   if (!config) {
-    exitWithError('Configuration not found.', 'Run `git-ai config` to set up your AI provider.');
+    const localError = getLocalConfigError();
+    const hint = localError
+      ? `Invalid local config at ${localError.path}: ${localError.error}`
+      : 'Run `git-ai config` to set up your AI provider.';
+    exitWithError('Configuration not found.', hint);
+  }
+  const localConfigError = getLocalConfigError();
+  if (localConfigError && !hookMode) {
+    console.log(
+      chalk.yellow(`⚠️  Failed to parse ${localConfigError.path}: ${localConfigError.error}`)
+    );
   }
 
   // Override locale if provided
@@ -129,6 +148,11 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
     }
     if (truncated) {
       console.log(chalk.yellow('\n⚠️  Diff was truncated due to size limits.'));
+      console.log(
+        chalk.gray(
+          '   Tip: add large files to .git-aiignore or set GIT_AI_MAX_DIFF_CHARS / OCO_TOKENS_MAX_INPUT.'
+        )
+      );
     }
     diffInfoPrinted = true;
   };
@@ -339,4 +363,3 @@ async function performCommit(message: string): Promise<void> {
     exitWithError(errorMessage);
   }
 }
-

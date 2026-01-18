@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { getConfigPath, getMergedConfig, setConfig } from '../utils/config.js';
+import { getConfigPath, getMergedConfig, getLocalConfigError, setConfig } from '../utils/config.js';
 import type { AIConfig } from '../types.js';
 
 export interface ConfigGetOptions {
@@ -101,6 +101,10 @@ export function runConfigDescribe(options: { json?: boolean } = {}): void {
       maxOutputTokens: ['GIT_AI_MAX_OUTPUT_TOKENS', 'OCO_TOKENS_MAX_OUTPUT'],
       timeoutMs: ['GIT_AI_TIMEOUT_MS'],
       debug: ['GIT_AI_DEBUG'],
+      autoAgent: ['GIT_AI_AUTO_AGENT', 'GIT_AI_DISABLE_AGENT', 'GIT_AI_AGENT_STRATEGY'],
+      recentCommits: ['GIT_AI_RECENT_COMMITS_ALL', 'GIT_AI_RECENT_COMMITS_FALLBACK'],
+      updateCheck: ['GIT_AI_DISABLE_UPDATE', 'GIT_AI_NO_UPDATE', 'GIT_AI_UPDATE_INTERVAL_HOURS'],
+      msgDelimiter: ['GIT_AI_MSG_DELIM'],
     },
   };
 
@@ -124,12 +128,14 @@ export function runConfigDescribe(options: { json?: boolean } = {}): void {
 export function runConfigGet(options: ConfigGetOptions = {}): void {
   const effective = getMergedConfig();
   const local = safeReadLocalConfig();
+  const localError = getLocalConfigError();
 
   const payload = {
     configPath: getConfigPath(),
     localConfigPath: getLocalConfigPath(),
     effective: redactConfigForDisplay(effective),
     local: options.local ? local : undefined,
+    localError: localError ? { path: localError.path, error: localError.error } : undefined,
   };
 
   if (options.json) {
@@ -140,6 +146,11 @@ export function runConfigGet(options: ConfigGetOptions = {}): void {
   console.log(chalk.cyan('\n🔧 git-ai configuration\n'));
   console.log(chalk.gray(`Global config path: ${payload.configPath}`));
   console.log(chalk.gray(`Local config path : ${payload.localConfigPath}`));
+  if (payload.localError) {
+    console.log(
+      chalk.yellow(`⚠️  Failed to parse ${payload.localError.path}: ${payload.localError.error}`)
+    );
+  }
   console.log(chalk.cyan('\nEffective config:'));
   Object.entries(payload.effective).forEach(([k, v]) => {
     if (v === undefined || v === '') return;
