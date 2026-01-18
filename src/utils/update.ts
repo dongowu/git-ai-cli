@@ -1,13 +1,67 @@
 import https from 'node:https';
 import { createRequire } from 'node:module';
 import chalk from 'chalk';
+import Conf from 'conf';
 
 const require = createRequire(import.meta.url);
 const packageJson = require('../../package.json');
 
 const REGISTRY_URL = 'https://registry.npmjs.org/@dongowu/git-ai-cli/latest';
+const DEFAULT_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24h
 
-export async function checkUpdate(): Promise<void> {
+type UpdateCache = {
+  lastChecked?: number;
+  lastNotifiedVersion?: string;
+};
+
+const updateCache = new Conf<UpdateCache>({
+  projectName: 'git-ai-cli',
+  configName: 'update',
+});
+
+function parseBooleanEnv(value: string | undefined): boolean | undefined {
+  if (!value) return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) return false;
+  return undefined;
+}
+
+function getCheckIntervalMs(): number {
+  const rawHours = process.env.GIT_AI_UPDATE_INTERVAL_HOURS;
+  const parsed = rawHours ? Number.parseInt(rawHours, 10) : Number.NaN;
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed * 60 * 60 * 1000;
+  }
+  return DEFAULT_CHECK_INTERVAL_MS;
+}
+
+function shouldSkipUpdateCheck(): boolean {
+  const disabled =
+    parseBooleanEnv(process.env.GIT_AI_DISABLE_UPDATE) ??
+    parseBooleanEnv(process.env.GIT_AI_NO_UPDATE);
+  if (disabled) return true;
+
+  if (process.env.CI) return true;
+
+  // Avoid noisy output in non-interactive contexts (hooks, pipes, CI).
+  if (!process.stdout.isTTY) return true;
+
+  return false;
+}
+
+export async function checkUpdate(options: { allow?: boolean } = {}): Promise<void> {
+  if (options.allow === false) return;
+  if (shouldSkipUpdateCheck()) return;
+
+  const now = Date.now();
+  const intervalMs = getCheckIntervalMs();
+  const lastChecked = updateCache.get('lastChecked');
+  if (lastChecked && now - lastChecked < intervalMs) return;
+
+  // Mark as checked before the network call to avoid repeated attempts on failure.
+  updateCache.set('lastChecked', now);
+
   return new Promise((resolve) => {
     const req = https.get(REGISTRY_URL, { timeout: 1000 }, (res) => {
       if (res.statusCode !== 200) {
@@ -25,7 +79,11 @@ export async function checkUpdate(): Promise<void> {
           if (latest && current && latest !== current) {
             // Simple semantic version check (naive but works for distinct releases)
             if (isNewer(latest, current)) {
-              printUpdateMessage(current, latest);
+              const lastNotified = updateCache.get('lastNotifiedVersion');
+              if (lastNotified !== latest) {
+                printUpdateMessage(current, latest);
+                updateCache.set('lastNotifiedVersion', latest);
+              }
             }
           }
         } catch {

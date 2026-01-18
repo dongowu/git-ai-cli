@@ -121,6 +121,13 @@ Common env overrides (higher priority than config files):
 - `GIT_AI_TIMEOUT_MS` (request timeout, default 120000)
 - `GIT_AI_MAX_DIFF_CHARS` (diff truncation length)
 - `GIT_AI_MAX_OUTPUT_TOKENS` (output token limit)
+- `GIT_AI_AUTO_AGENT=0` (disable auto Agent; `-a` still forces it)
+- `GIT_AI_DISABLE_AGENT=1` (disable Agent completely)
+- `GIT_AI_RECENT_COMMITS_ALL=1` (recent commits not limited by author)
+- `GIT_AI_RECENT_COMMITS_FALLBACK=0` (disable no-author fallback)
+- `GIT_AI_DISABLE_UPDATE=1` (disable update check)
+- `GIT_AI_UPDATE_INTERVAL_HOURS=24` (update check interval in hours)
+- `GIT_AI_MSG_DELIM=<<<GIT_AI_END>>>` (delimiter for `git-ai msg -n`)
 - `GIT_AI_DEBUG=1` (print more error details)
 
 OpenCommit-compatible env vars:
@@ -189,6 +196,12 @@ git-ai report
 
 # Generate report for the last 30 days
 git-ai report --days 30
+
+# Specify date range
+git-ai report --from 2025-01-01 --to 2025-01-31
+
+# JSON output (for scripts)
+git-ai report --days 7 --json
 ```
 
 ---
@@ -211,6 +224,8 @@ git-ai report --days 30
 | `git-ai msg` | | Generate message only (stdout for scripts) |
 
 ---
+
+Tip: `git-ai msg -n` uses `<<<GIT_AI_END>>>` as the default delimiter; prefer `--json` for scripts.
 
 ## 📄 License
 

@@ -42,18 +42,44 @@ if [ -s "$COMMIT_MSG_FILE" ]; then
   fi
 fi
 
-# Generate commit message using git-ai msg
+# Generate commit message using git-ai msg (JSON to avoid spinner)
 if command -v git-ai >/dev/null 2>&1; then
-  MSG=$(git-ai msg --quiet 2>/dev/null)
+  OUTPUT=$(git-ai msg --json 2>/dev/null)
   EXIT_CODE=$?
 
-  if [ $EXIT_CODE -eq 0 ] && [ -n "$MSG" ]; then
+  MSG=""
+  ERR=""
+
+  if command -v node >/dev/null 2>&1; then
+    if [ $EXIT_CODE -eq 0 ]; then
+      MSG=$(printf '%s' "$OUTPUT" | node -e "const fs=require('fs');let input='';try{input=fs.readFileSync(0,'utf8');const data=JSON.parse(input||'{}');const msg=data.message||(Array.isArray(data.messages)?data.messages[0]:null);if(msg)process.stdout.write(msg);}catch{}")
+    else
+      ERR=$(printf '%s' "$OUTPUT" | node -e "const fs=require('fs');let input='';try{input=fs.readFileSync(0,'utf8');const data=JSON.parse(input||'{}');if(data&&data.error)process.stdout.write(String(data.error));}catch{}")
+    fi
+  fi
+
+  if [ -z "$MSG" ] && [ -z "$ERR" ]; then
+    MSG=$(printf '%s' "$OUTPUT" | sed -n 's/.*\"message\"[ ]*:[ ]*\"\\(.*\\)\".*/\\1/p' | head -1)
+    if [ -z "$MSG" ]; then
+      ERR=$(printf '%s' "$OUTPUT" | sed -n 's/.*\"error\"[ ]*:[ ]*\"\\(.*\\)\".*/\\1/p' | head -1)
+    fi
+  fi
+
+  if [ -n "$MSG" ]; then
     # Preserve existing comments, prepend AI message
     if [ -f "$COMMIT_MSG_FILE" ]; then
       COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
       printf '%s\\n\\n%s\\n' "$MSG" "$COMMENTS" > "$COMMIT_MSG_FILE"
     else
       printf '%s\\n' "$MSG" > "$COMMIT_MSG_FILE"
+    fi
+  elif [ -n "$ERR" ]; then
+    ERR=$(printf '%s' "$ERR" | tr '\\n' ' ' | sed -e 's/[[:space:]]\\+/ /g' -e 's/^ *//' -e 's/ *$//' | cut -c1-180)
+    if [ -f "$COMMIT_MSG_FILE" ]; then
+      COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
+      printf '# git-ai: failed to generate commit message\\n# %s\\n\\n%s\\n' "$ERR" "$COMMENTS" > "$COMMIT_MSG_FILE"
+    else
+      printf '# git-ai: failed to generate commit message\\n# %s\\n' "$ERR" > "$COMMIT_MSG_FILE"
     fi
   fi
 fi
@@ -106,17 +132,43 @@ if [ -s "$COMMIT_MSG_FILE" ]; then
   fi
 fi
 
-# Generate commit message using git-ai msg
+# Generate commit message using git-ai msg (JSON to avoid spinner)
 if command -v git-ai >/dev/null 2>&1; then
-  MSG=$(git-ai msg --quiet 2>/dev/null)
+  OUTPUT=$(git-ai msg --json 2>/dev/null)
   EXIT_CODE=$?
 
-  if [ $EXIT_CODE -eq 0 ] && [ -n "$MSG" ]; then
+  MSG=""
+  ERR=""
+
+  if command -v node >/dev/null 2>&1; then
+    if [ $EXIT_CODE -eq 0 ]; then
+      MSG=$(printf '%s' "$OUTPUT" | node -e "const fs=require('fs');let input='';try{input=fs.readFileSync(0,'utf8');const data=JSON.parse(input||'{}');const msg=data.message||(Array.isArray(data.messages)?data.messages[0]:null);if(msg)process.stdout.write(msg);}catch{}")
+    else
+      ERR=$(printf '%s' "$OUTPUT" | node -e "const fs=require('fs');let input='';try{input=fs.readFileSync(0,'utf8');const data=JSON.parse(input||'{}');if(data&&data.error)process.stdout.write(String(data.error));}catch{}")
+    fi
+  fi
+
+  if [ -z "$MSG" ] && [ -z "$ERR" ]; then
+    MSG=$(printf '%s' "$OUTPUT" | sed -n 's/.*\"message\"[ ]*:[ ]*\"\\(.*\\)\".*/\\1/p' | head -1)
+    if [ -z "$MSG" ]; then
+      ERR=$(printf '%s' "$OUTPUT" | sed -n 's/.*\"error\"[ ]*:[ ]*\"\\(.*\\)\".*/\\1/p' | head -1)
+    fi
+  fi
+
+  if [ -n "$MSG" ]; then
     if [ -f "$COMMIT_MSG_FILE" ]; then
       COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
       printf '%s\\n\\n%s\\n' "$MSG" "$COMMENTS" > "$COMMIT_MSG_FILE"
     else
       printf '%s\\n' "$MSG" > "$COMMIT_MSG_FILE"
+    fi
+  elif [ -n "$ERR" ]; then
+    ERR=$(printf '%s' "$ERR" | tr '\\n' ' ' | sed -e 's/[[:space:]]\\+/ /g' -e 's/^ *//' -e 's/ *$//' | cut -c1-180)
+    if [ -f "$COMMIT_MSG_FILE" ]; then
+      COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
+      printf '# git-ai: failed to generate commit message\\n# %s\\n\\n%s\\n' "$ERR" "$COMMENTS" > "$COMMIT_MSG_FILE"
+    else
+      printf '# git-ai: failed to generate commit message\\n# %s\\n' "$ERR" > "$COMMIT_MSG_FILE"
     fi
   fi
 fi

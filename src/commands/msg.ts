@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import ora from 'ora';
-import { getConfig } from '../utils/config.js';
+import { getConfig, getLocalConfigError } from '../utils/config.js';
 import {
   isGitInstalled,
   isInGitRepo,
@@ -27,11 +27,17 @@ export interface MsgResult {
   message?: string;
   messages?: string[];
   error?: string;
+  warnings?: string[];
   metadata?: {
     stagedFiles: string[];
     truncated: boolean;
     ignoredFiles: string[];
   };
+}
+
+function getMsgDelimiter(): string {
+  const raw = (process.env.GIT_AI_MSG_DELIM || '').trim();
+  return raw || '<<<GIT_AI_END>>>';
 }
 
 function exitWithError(message: string, options: MsgOptions): never {
@@ -64,7 +70,20 @@ export async function runMsg(options: MsgOptions = {}): Promise<void> {
   // Check config
   const config = getConfig();
   if (!config) {
-    exitWithError('Configuration not found. Run `git-ai config` first.', options);
+    const localError = getLocalConfigError();
+    const suffix = localError
+      ? ` Invalid local config at ${localError.path}: ${localError.error}`
+      : ' Run `git-ai config` first.';
+    exitWithError(`Configuration not found.${suffix}`, options);
+  }
+  const localConfigError = getLocalConfigError();
+  const warnings: string[] = [];
+  if (localConfigError) {
+    const warning = `Failed to parse ${localConfigError.path}: ${localConfigError.error}`;
+    warnings.push(warning);
+    if (!json && !quiet) {
+      console.log(chalk.yellow(`⚠️  ${warning}`));
+    }
   }
 
   // Override locale if provided
@@ -113,16 +132,25 @@ export async function runMsg(options: MsgOptions = {}): Promise<void> {
         const result: MsgResult = {
           success: true,
           messages: unique,
+          warnings: warnings.length ? warnings : undefined,
           metadata: { stagedFiles, truncated, ignoredFiles },
         };
         console.log(JSON.stringify(result, null, 2));
       } else {
-        // Plain output: use delimiter for multi-line message safety
-        // Each message separated by ---END---
+        // Plain output: use a safer delimiter for multi-line messages
+        const delimiter = getMsgDelimiter();
+        const hasDelimiter = unique.some((msg) => msg.includes(delimiter));
+        if (hasDelimiter) {
+          console.error(
+            chalk.yellow(
+              `⚠️  Message contains delimiter "${delimiter}". Use --json for safe parsing.`
+            )
+          );
+        }
         unique.forEach((msg, i) => {
           console.log(msg);
           if (i < unique.length - 1) {
-            console.log('---END---');
+            console.log(delimiter);
           }
         });
       }
@@ -139,6 +167,7 @@ export async function runMsg(options: MsgOptions = {}): Promise<void> {
         const result: MsgResult = {
           success: true,
           message,
+          warnings: warnings.length ? warnings : undefined,
           metadata: { stagedFiles, truncated, ignoredFiles },
         };
         console.log(JSON.stringify(result, null, 2));
