@@ -73,6 +73,12 @@ git-ai init
     "issuePlacement": "footer",
     "issueFooterPrefix": "Refs",
     "requireIssue": false
+  },
+  "branch": {
+    "types": ["feat", "fix", "docs"],
+    "pattern": "{type}/{issue?}{name}",
+    "issueSeparator": "-",
+    "nameMaxLength": 50
   }
 }
 ```
@@ -97,7 +103,12 @@ GIT_AI_HOOK_FALLBACK=0 git commit
 git-ai msg --json
 ```
 
-6) **PR / Release / Report**
+6) **Create branch (interactive)**
+```bash
+git-ai branch
+```
+
+7) **PR / Release / Report**
 ```bash
 # PR description
 git-ai pr --base main --head HEAD
@@ -133,12 +144,17 @@ git-ai report --days 7
 - `fallbackModels`: fallback list when the primary model fails
 - `policy.strict`: block commit when rules are violated
 - `rules`: types/scopes/length/issue rules
+- `branch`: branch naming rules (types/pattern/length)
 
 ### Rules & Policy
 - `issuePattern`: regex for issue IDs
 - `issuePlacement`: `scope | subject | footer`
 - `requireIssue`: enforce issue id
 - `policy.strict`: block commit when invalid
+- `branch.pattern`: branch template (e.g., `{type}/{issue?}{name}`)
+- `branch.types`: branch type list
+- `branch.issueSeparator`: issue separator (default `-`)
+- `branch.nameMaxLength`: max length for name
 
 ### CLI config
 ```bash
@@ -153,6 +169,9 @@ git-ai config set fallbackModels "deepseek-chat,qwen-turbo"
 # Rules (JSON or @file)
 git-ai config set rules '{"types":["feat","fix"]}'
 git-ai config set rules @rules.json --local
+
+# Branch rules
+git-ai config set branch '{"types":["feat","fix"],"pattern":"{type}/{issue?}{name}"}'
 ```
 
 ---
@@ -166,6 +185,7 @@ git-ai config set rules @rules.json --local
 | `git-ai` / `git-ai commit` | Interactive commit |
 | `git-ai -a` | Agent mode |
 | `git-ai msg` | Message only (scripts/hooks) |
+| `git-ai branch` | Create branch interactively |
 | `git-ai hook install/remove` | Hook management |
 | `git-ai report` | Weekly report |
 | `git-ai pr` | PR description |
@@ -186,6 +206,8 @@ git-ai config set rules @rules.json --local
 - `GIT_AI_OUTPUT_FORMAT=json`
 - `GIT_AI_MSG_DELIM=<<<GIT_AI_END>>>`
 - `GIT_AI_HOOK_STRICT=1` / `GIT_AI_HOOK_FALLBACK=0`
+- `GIT_AI_BRANCH_PATTERN` / `GIT_AI_BRANCH_TYPES`
+- `GIT_AI_BRANCH_ISSUE_SEPARATOR` / `GIT_AI_BRANCH_NAME_MAXLEN`
 
 ---
 

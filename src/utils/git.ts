@@ -420,6 +420,32 @@ export async function getLastTag(): Promise<string | null> {
   }
 }
 
+export async function isValidBranchName(name: string): Promise<boolean> {
+  try {
+    await execa('git', ['check-ref-format', '--branch', name]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function branchExists(name: string): Promise<boolean> {
+  try {
+    await execa('git', ['show-ref', '--verify', '--quiet', `refs/heads/${name}`]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function checkoutBranch(name: string): Promise<void> {
+  await execa('git', ['checkout', name]);
+}
+
+export async function createBranch(name: string): Promise<void> {
+  await execa('git', ['checkout', '-b', name]);
+}
+
 export async function searchCode(pattern: string): Promise<string> {
   try {
     // Use git grep to search in tracked files (it's faster and respects .gitignore)

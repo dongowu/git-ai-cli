@@ -9,6 +9,7 @@ import { runHook } from './commands/hook.js';
 import { runReport } from './commands/report.js';
 import { runPr } from './commands/pr.js';
 import { runRelease } from './commands/release.js';
+import { runBranch } from './commands/branch.js';
 import { checkUpdate } from './utils/update.js';
 
 const require = createRequire(import.meta.url);
@@ -218,6 +219,38 @@ cli
       await runRelease({
         from: options.from,
         to: options.to,
+        json: options.json,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error(chalk.red(`\n❌ Error: ${message}\n`));
+      process.exit(1);
+    }
+  });
+
+cli
+  .command('branch', 'Create a new branch with guided naming')
+  .option('--type <type>', 'Branch type (feat/fix/docs/...)')
+  .option('--name <name>', 'Branch name/slug')
+  .option('--issue <id>', 'Issue ID (e.g., PROJ-123)')
+  .option('--pattern <pattern>', 'Override branch pattern (e.g., {type}/{issue?}{name})')
+  .option('--dry-run', 'Preview branch name without creating')
+  .option('--json', 'Output as JSON')
+  .action(async (options: {
+    type?: string;
+    name?: string;
+    issue?: string;
+    pattern?: string;
+    dryRun?: boolean;
+    json?: boolean;
+  }) => {
+    try {
+      await runBranch({
+        type: options.type,
+        name: options.name,
+        issue: options.issue,
+        pattern: options.pattern,
+        dryRun: options.dryRun,
         json: options.json,
       });
     } catch (error) {

@@ -12,6 +12,7 @@ export interface AIConfig {
   rulesPreset?: string;
   fallbackModels?: string[];
   policy?: CommitPolicy;
+  branch?: BranchConfig;
 }
 
 export interface CommitRules {
@@ -28,6 +29,13 @@ export interface CommitRules {
 
 export interface CommitPolicy {
   strict?: boolean;
+}
+
+export interface BranchConfig {
+  types?: string[];
+  pattern?: string;
+  issueSeparator?: string;
+  nameMaxLength?: number;
 }
 
 export interface ProviderPreset {

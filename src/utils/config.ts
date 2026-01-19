@@ -59,6 +59,10 @@ const config = new Conf<AIConfig>({
       type: 'object',
       default: {},
     },
+    branch: {
+      type: 'object',
+      default: {},
+    },
   },
 });
 
@@ -145,6 +149,28 @@ function getEnvConfig(baseProvider?: string): Partial<AIConfig> {
     env.policy = { ...(env.policy || {}), strict: policyStrict };
   }
 
+  const branchPattern = process.env.GIT_AI_BRANCH_PATTERN;
+  if (branchPattern) {
+    env.branch = { ...(env.branch || {}), pattern: branchPattern };
+  }
+  const branchTypesRaw = process.env.GIT_AI_BRANCH_TYPES;
+  if (branchTypesRaw) {
+    const types = branchTypesRaw
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (types.length) env.branch = { ...(env.branch || {}), types };
+  }
+  const branchIssueSep = process.env.GIT_AI_BRANCH_ISSUE_SEPARATOR;
+  if (branchIssueSep) {
+    env.branch = { ...(env.branch || {}), issueSeparator: branchIssueSep };
+  }
+  const branchMaxLenRaw = process.env.GIT_AI_BRANCH_NAME_MAXLEN;
+  const branchMaxLen = branchMaxLenRaw ? Number.parseInt(branchMaxLenRaw, 10) : Number.NaN;
+  if (Number.isFinite(branchMaxLen) && branchMaxLen > 0) {
+    env.branch = { ...(env.branch || {}), nameMaxLength: branchMaxLen };
+  }
+
   const issuePattern = process.env.GIT_AI_ISSUE_PATTERN;
   if (issuePattern) {
     env.rules = { ...(env.rules || {}), issuePattern };
@@ -182,6 +208,7 @@ export function getMergedConfig(): Partial<AIConfig> {
     rulesPreset: config.get('rulesPreset'),
     fallbackModels: config.get('fallbackModels'),
     policy: config.get('policy'),
+    branch: config.get('branch'),
   };
 
   const localConfig = getLocalConfig();
@@ -193,6 +220,9 @@ export function getMergedConfig(): Partial<AIConfig> {
   }
   if (merged.policy || envConfig.policy) {
     finalConfig.policy = { ...(merged.policy || {}), ...(envConfig.policy || {}) };
+  }
+  if (merged.branch || envConfig.branch) {
+    finalConfig.branch = { ...(merged.branch || {}), ...(envConfig.branch || {}) };
   }
   return finalConfig;
 }
