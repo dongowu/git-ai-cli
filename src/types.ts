@@ -7,6 +7,27 @@ export interface AIConfig {
   locale: 'zh' | 'en';
   customPrompt?: string;
   enableFooter?: boolean;
+  outputFormat?: 'text' | 'json';
+  rules?: CommitRules;
+  rulesPreset?: string;
+  fallbackModels?: string[];
+  policy?: CommitPolicy;
+}
+
+export interface CommitRules {
+  types?: string[];
+  scopes?: string[];
+  scopeMap?: Record<string, string>;
+  maxSubjectLength?: number;
+  requireScope?: boolean;
+  issuePattern?: string;
+  issuePlacement?: 'scope' | 'subject' | 'footer';
+  issueFooterPrefix?: string;
+  requireIssue?: boolean;
+}
+
+export interface CommitPolicy {
+  strict?: boolean;
 }
 
 export interface ProviderPreset {

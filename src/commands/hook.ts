@@ -44,7 +44,7 @@ fi
 
 # Generate commit message using git-ai msg (JSON to avoid spinner)
 if command -v git-ai >/dev/null 2>&1; then
-  OUTPUT=$(git-ai msg --json 2>/dev/null)
+  OUTPUT=$(GIT_AI_ENABLE_FOOTER="\${GIT_AI_ENABLE_FOOTER:-0}" git-ai msg --json 2>/dev/null)
   EXIT_CODE=$?
 
   MSG=""
@@ -75,11 +75,44 @@ if command -v git-ai >/dev/null 2>&1; then
     fi
   elif [ -n "$ERR" ]; then
     ERR=$(printf '%s' "$ERR" | tr '\\n' ' ' | sed -e 's/[[:space:]]\\+/ /g' -e 's/^ *//' -e 's/ *$//' | cut -c1-180)
-    if [ -f "$COMMIT_MSG_FILE" ]; then
-      COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
-      printf '# git-ai: failed to generate commit message\\n# %s\\n\\n%s\\n' "$ERR" "$COMMENTS" > "$COMMIT_MSG_FILE"
+    if [ "$GIT_AI_HOOK_STRICT" = "1" ]; then
+      if [ -f "$COMMIT_MSG_FILE" ]; then
+        COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
+        printf '# git-ai: failed to generate commit message\\n# %s\\n\\n%s\\n' "$ERR" "$COMMENTS" > "$COMMIT_MSG_FILE"
+      else
+        printf '# git-ai: failed to generate commit message\\n# %s\\n' "$ERR" > "$COMMIT_MSG_FILE"
+      fi
+      exit 1
+    fi
+
+    FALLBACK=""
+    if [ "\${GIT_AI_HOOK_FALLBACK:-1}" = "1" ]; then
+      FILES=$(git diff --cached --name-only 2>/dev/null)
+      COUNT=$(printf '%s\\n' "$FILES" | grep -c .)
+      if [ "$COUNT" -gt 0 ]; then
+        if [ "$COUNT" -le 3 ]; then
+          SHORT=$(printf '%s\\n' "$FILES" | head -n 3 | awk 'BEGIN{ORS="";} {printf "%s%s", (NR==1?"":", "), $0} END{print ""}')
+          FALLBACK="chore: update \${SHORT}"
+        else
+          FALLBACK="chore: update \${COUNT} files"
+        fi
+      fi
+    fi
+
+    if [ -n "$FALLBACK" ]; then
+      if [ -f "$COMMIT_MSG_FILE" ]; then
+        COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
+        printf '%s\\n\\n%s\\n' "$FALLBACK" "$COMMENTS" > "$COMMIT_MSG_FILE"
+      else
+        printf '%s\\n' "$FALLBACK" > "$COMMIT_MSG_FILE"
+      fi
     else
-      printf '# git-ai: failed to generate commit message\\n# %s\\n' "$ERR" > "$COMMIT_MSG_FILE"
+      if [ -f "$COMMIT_MSG_FILE" ]; then
+        COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
+        printf '# git-ai: failed to generate commit message\\n# %s\\n\\n%s\\n' "$ERR" "$COMMENTS" > "$COMMIT_MSG_FILE"
+      else
+        printf '# git-ai: failed to generate commit message\\n# %s\\n' "$ERR" > "$COMMIT_MSG_FILE"
+      fi
     fi
   fi
 fi
@@ -134,7 +167,7 @@ fi
 
 # Generate commit message using git-ai msg (JSON to avoid spinner)
 if command -v git-ai >/dev/null 2>&1; then
-  OUTPUT=$(git-ai msg --json 2>/dev/null)
+  OUTPUT=$(GIT_AI_ENABLE_FOOTER="\${GIT_AI_ENABLE_FOOTER:-0}" git-ai msg --json 2>/dev/null)
   EXIT_CODE=$?
 
   MSG=""
@@ -164,11 +197,44 @@ if command -v git-ai >/dev/null 2>&1; then
     fi
   elif [ -n "$ERR" ]; then
     ERR=$(printf '%s' "$ERR" | tr '\\n' ' ' | sed -e 's/[[:space:]]\\+/ /g' -e 's/^ *//' -e 's/ *$//' | cut -c1-180)
-    if [ -f "$COMMIT_MSG_FILE" ]; then
-      COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
-      printf '# git-ai: failed to generate commit message\\n# %s\\n\\n%s\\n' "$ERR" "$COMMENTS" > "$COMMIT_MSG_FILE"
+    if [ "$GIT_AI_HOOK_STRICT" = "1" ]; then
+      if [ -f "$COMMIT_MSG_FILE" ]; then
+        COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
+        printf '# git-ai: failed to generate commit message\\n# %s\\n\\n%s\\n' "$ERR" "$COMMENTS" > "$COMMIT_MSG_FILE"
+      else
+        printf '# git-ai: failed to generate commit message\\n# %s\\n' "$ERR" > "$COMMIT_MSG_FILE"
+      fi
+      exit 1
+    fi
+
+    FALLBACK=""
+    if [ "\${GIT_AI_HOOK_FALLBACK:-1}" = "1" ]; then
+      FILES=$(git diff --cached --name-only 2>/dev/null)
+      COUNT=$(printf '%s\\n' "$FILES" | grep -c .)
+      if [ "$COUNT" -gt 0 ]; then
+        if [ "$COUNT" -le 3 ]; then
+          SHORT=$(printf '%s\\n' "$FILES" | head -n 3 | awk 'BEGIN{ORS="";} {printf "%s%s", (NR==1?"":", "), $0} END{print ""}')
+          FALLBACK="chore: update \${SHORT}"
+        else
+          FALLBACK="chore: update \${COUNT} files"
+        fi
+      fi
+    fi
+
+    if [ -n "$FALLBACK" ]; then
+      if [ -f "$COMMIT_MSG_FILE" ]; then
+        COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
+        printf '%s\\n\\n%s\\n' "$FALLBACK" "$COMMENTS" > "$COMMIT_MSG_FILE"
+      else
+        printf '%s\\n' "$FALLBACK" > "$COMMIT_MSG_FILE"
+      fi
     else
-      printf '# git-ai: failed to generate commit message\\n# %s\\n' "$ERR" > "$COMMIT_MSG_FILE"
+      if [ -f "$COMMIT_MSG_FILE" ]; then
+        COMMENTS=$(grep "^#" "$COMMIT_MSG_FILE" || true)
+        printf '# git-ai: failed to generate commit message\\n# %s\\n\\n%s\\n' "$ERR" "$COMMENTS" > "$COMMIT_MSG_FILE"
+      else
+        printf '# git-ai: failed to generate commit message\\n# %s\\n' "$ERR" > "$COMMIT_MSG_FILE"
+      fi
     fi
   fi
 fi

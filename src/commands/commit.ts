@@ -16,6 +16,8 @@ import {
 import {
   createAIClient,
   generateCommitMessage,
+  validateCommitRules,
+  validateCommitMessage,
   type CommitMessageGenerationInput,
 } from '../utils/ai.js';
 import type { AIConfig } from '../types.js';
@@ -120,6 +122,11 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
       chalk.yellow(`⚠️  Failed to parse ${localConfigError.path}: ${localConfigError.error}`)
     );
   }
+  const rulesIssues = validateCommitRules(config.rules);
+  if ((rulesIssues.errors.length || rulesIssues.warnings.length) && !hookMode) {
+    const combined = [...rulesIssues.errors, ...rulesIssues.warnings];
+    console.log(chalk.yellow(`⚠️  Rules config issues: ${combined.join('; ')}`));
+  }
 
   // Override locale if provided
   if (locale && (locale === 'zh' || locale === 'en')) {
@@ -135,6 +142,7 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
   }
   const branchName = await getBranchName();
   const recentCommits = await getRecentCommits(10); // Get last 10 commits for style reference
+  const policyStrict = config.policy?.strict === true;
 
   let diffCache: { diff: string; truncated: boolean; ignoredFiles: string[] } | null = null;
   let diffInfoPrinted = false;
@@ -225,6 +233,15 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
   if (autoCommit) {
     console.log(chalk.green('\n✨ Generated commit message:\n'));
     console.log(chalk.white.bold(`   ${commitMessage.split('\n').join('\n   ')}`));
+    const validation = validateCommitMessage(commitMessage, config, { branchName, stagedFiles });
+    if (validation.errors.length) {
+      const msg = `Commit policy violation: ${validation.errors.join('; ')}`;
+      if (policyStrict) {
+        exitWithError(msg);
+      } else {
+        console.log(chalk.yellow(`⚠️  ${msg}`));
+      }
+    }
     await performCommit(commitMessage);
     return;
   }
@@ -250,6 +267,15 @@ export async function runCommit(options: CommitOptions = {}): Promise<void> {
     ]);
 
     if (action === 'commit') {
+      const validation = validateCommitMessage(commitMessage, config, { branchName, stagedFiles });
+      if (validation.errors.length) {
+        const msg = `Commit policy violation: ${validation.errors.join('; ')}`;
+        if (policyStrict) {
+          console.log(chalk.red(`❌ ${msg}`));
+          continue;
+        }
+        console.log(chalk.yellow(`⚠️  ${msg}`));
+      }
       await performCommit(commitMessage);
       break;
     } else if (action === 'edit') {

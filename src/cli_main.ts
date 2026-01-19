@@ -7,6 +7,8 @@ import { runCommit } from './commands/commit.js';
 import { runMsg } from './commands/msg.js';
 import { runHook } from './commands/hook.js';
 import { runReport } from './commands/report.js';
+import { runPr } from './commands/pr.js';
+import { runRelease } from './commands/release.js';
 import { checkUpdate } from './utils/update.js';
 
 const require = createRequire(import.meta.url);
@@ -176,6 +178,44 @@ cli
     try {
       await runReport({
         days: options.days ? Number(options.days) : undefined,
+        from: options.from,
+        to: options.to,
+        json: options.json,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error(chalk.red(`\n❌ Error: ${message}\n`));
+      process.exit(1);
+    }
+  });
+
+cli
+  .command('pr', 'Generate AI-powered pull request description')
+  .option('--base <ref>', 'Base branch or ref (e.g., main)')
+  .option('--head <ref>', 'Head ref (default: HEAD)')
+  .option('--json', 'Output as JSON')
+  .action(async (options: { base?: string; head?: string; json?: boolean }) => {
+    try {
+      await runPr({
+        base: options.base,
+        head: options.head,
+        json: options.json,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error(chalk.red(`\n❌ Error: ${message}\n`));
+      process.exit(1);
+    }
+  });
+
+cli
+  .command('release', 'Generate AI-powered release notes from git history')
+  .option('--from <ref>', 'Start ref (default: last tag)')
+  .option('--to <ref>', 'End ref (default: HEAD)')
+  .option('--json', 'Output as JSON')
+  .action(async (options: { from?: string; to?: string; json?: boolean }) => {
+    try {
+      await runRelease({
         from: options.from,
         to: options.to,
         json: options.json,

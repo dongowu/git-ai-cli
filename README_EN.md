@@ -18,68 +18,42 @@
 <p align="center">
   <a href="./README.md">中文文档</a> •
   <a href="#-quick-start">Quick Start</a> •
-  <a href="#-features">Features</a> •
-  <a href="#-usage">Usage</a> •
-  <a href="#-configuration">Configuration</a>
+  <a href="#-usage-guide-recommended">Usage</a> •
+  <a href="#-configuration">Configuration</a> •
+  <a href="#-command-reference">Commands</a>
 </p>
 
 ---
 
-**git-ai-cli** is more than just a commit message generator. It's your **AI Development Assistant**. It understands your code diffs, recognizes your branch intent, and even writes your weekly reports.
+**git-ai-cli** is more than a commit message generator. It understands diffs, enforces team rules, and generates reports, PR descriptions, and release notes.
 
 ---
 
 ## 🚀 Quick Start
 
 ```bash
-# 1. Install
+# 1) Install
 npm install -g @dongowu/git-ai-cli
 
-# 2. Initialize (Auto-detects local models or configures API)
+# 2) Initialize (auto-detect local models or configure API)
 git-ai init
 
-# 3. Use
+# 3) Use
 git add .
 git-ai
 ```
 
 ---
 
-## ✨ Features
+## ✅ Usage Guide (Recommended)
 
-### 1. 🔒 Privacy First & Local Models
-- **Ollama Zero-Config**: Automatically detects locally running Ollama models (like `llama3`, `deepseek-coder`). No manual setup required. Your data never leaves your machine.
-- **DeepSeek/OpenAI**: Built-in support for popular API providers with optimized prompts.
+1) **Install & Init**
+```bash
+npm install -g @dongowu/git-ai-cli
+git-ai init
+```
 
-### 2. 🧠 Context Aware
-- **Style Learning**: Automatically analyzes your recent 10 commits to mimic your personal tone, format (e.g., emojis), and language style.
-- **Branch Awareness**: Reads your current branch name (e.g., `feat/user-login`, `fix/JIRA-123`) to generate semantic commits with Issue IDs or scopes.
-
-### 3. 🤖 Agent Intelligence (New)
-Evolving from a text generator to a code expert.
-- **Smart Diff**: The Agent analyzes file stats and reads only the critical diffs to reduce truncation and token usage on large refactors.
-- **Impact Analysis**: Changing a core API? The Agent proactively searches your codebase (`git grep`) to find usages and warns you about potential breaking changes in the commit body.
-- **Git Flow Guard**: Automatically enables deep analysis on `release/*` or `hotfix/*` branches to protect production code.
-
-### 4. ⚙️ Engineering Ready
-- **Project Config**: Create a `.git-ai.json` in your project root to share settings (model, prompts) with your team.
-- **Smart Ignore**: Use `.git-aiignore` to exclude auto-generated files (like `package-lock.json`) or large files to save tokens and improve accuracy.
-
-### 4. 🪝 Seamless Integration (Git Hook)
-- **Zero Distraction**: After installing the hook, just run `git commit` (without `-m`). AI automatically fills in the message and opens your editor.
-- **Compatibility**: Perfectly compatible with existing Git workflows. Supports `git commit --no-verify`.
-
-### 5. 📊 AI Reports
-- **One-Click Generation**: `git-ai report` analyzes your recent commits.
-- **Value Driven**: Transforms fragmented commits into structured reports highlighting "Core Outputs", "Bug Fixes", and "Technical Improvements".
-
----
-
-## ⚙️ Configuration
-
-### Project-Level Config `.git-ai.json`
-Create this file in your project root to override global settings:
-
+2) **Team config (recommended)**: create `.git-ai.json` in project root
 ```json
 {
   "provider": "deepseek",
@@ -87,55 +61,135 @@ Create this file in your project root to override global settings:
   "model": "deepseek-reasoner",
   "agentModel": "deepseek-chat",
   "locale": "en",
-  "enableFooter": true
+  "enableFooter": false,
+  "rulesPreset": "conventional",
+  "fallbackModels": ["deepseek-chat", "qwen-turbo"],
+  "policy": { "strict": true },
+  "rules": {
+    "types": ["feat", "fix", "docs", "refactor", "perf", "test", "chore", "build", "ci"],
+    "maxSubjectLength": 50,
+    "requireScope": false,
+    "issuePattern": "[A-Z]+-\\d+",
+    "issuePlacement": "footer",
+    "issueFooterPrefix": "Refs",
+    "requireIssue": false
+  }
 }
 ```
 
-Notes:
-- `model`: base generation model
-- `agentModel`: Agent mode (`-a`) model (pick a tool-capable model; DeepSeek typically uses `deepseek-chat`)
-- `locale`: only `zh` / `en`
-- It's recommended to set `apiKey` via env vars or global config (don't commit keys into the repo)
-
-### CLI Config (scriptable)
-
+3) **Daily commit**
 ```bash
-# Show effective config (includes env overrides)
-git-ai config get --json
-
-# Set global config
-git-ai config set model deepseek-chat
-
-# Set per-project config (write to .git-ai.json)
-git-ai config set agentModel deepseek-chat --local
-
-# List keys + env overrides
-git-ai config describe
+git add .
+git-ai
 ```
 
-### Environment Variables (CI/Scripts)
+4) **Hook (recommended)**
+```bash
+git-ai hook install
+# Block commit on failure (optional)
+GIT_AI_HOOK_STRICT=1 git commit
+# Disable fallback message (optional)
+GIT_AI_HOOK_FALLBACK=0 git commit
+```
 
-Common env overrides (higher priority than config files):
+5) **Scripts / CI**
+```bash
+git-ai msg --json
+```
+
+6) **PR / Release / Report**
+```bash
+# PR description
+git-ai pr --base main --head HEAD
+
+# Release notes
+git-ai release --from v1.0.0 --to HEAD
+
+# Weekly report
+git-ai report --days 7
+```
+
+---
+
+## ✨ Features
+
+- **DeepSeek/Qwen optimized**: intent-focused prompts
+- **Local privacy**: Ollama / LM Studio support
+- **Context aware**: branch rules, style learning, smart scope
+- **Agent mode**: impact analysis for large diffs
+- **Team rules**: presets + strict policy
+- **Git hooks**: zero-friction commits
+- **AI reports**: weekly report / PR / release notes
+
+---
+
+## ⚙️ Configuration
+
+### Project-level config `.git-ai.json`
+- `provider / baseUrl / model / agentModel`
+- `locale`: `zh` / `en`
+- `outputFormat`: `text` / `json`
+- `rulesPreset`: `conventional` / `angular` / `minimal`
+- `fallbackModels`: fallback list when the primary model fails
+- `policy.strict`: block commit when rules are violated
+- `rules`: types/scopes/length/issue rules
+
+### Rules & Policy
+- `issuePattern`: regex for issue IDs
+- `issuePlacement`: `scope | subject | footer`
+- `requireIssue`: enforce issue id
+- `policy.strict`: block commit when invalid
+
+### CLI config
+```bash
+# Show effective config
+git-ai config get --json
+
+# Preset / policy / fallback
+git-ai config set rulesPreset conventional
+git-ai config set policy '{"strict":true}'
+git-ai config set fallbackModels "deepseek-chat,qwen-turbo"
+
+# Rules (JSON or @file)
+git-ai config set rules '{"types":["feat","fix"]}'
+git-ai config set rules @rules.json --local
+```
+
+---
+
+## 🛠 Command Reference
+
+| Command | Description |
+|--------|-------------|
+| `git-ai init` | Initialize config |
+| `git-ai config get/set/describe` | Config management |
+| `git-ai` / `git-ai commit` | Interactive commit |
+| `git-ai -a` | Agent mode |
+| `git-ai msg` | Message only (scripts/hooks) |
+| `git-ai hook install/remove` | Hook management |
+| `git-ai report` | Weekly report |
+| `git-ai pr` | PR description |
+| `git-ai release` | Release notes |
+
+---
+
+## ⚡ Environment Variables
+
 - `GIT_AI_PROVIDER` / `GIT_AI_BASE_URL` / `GIT_AI_MODEL` / `GIT_AI_AGENT_MODEL`
-- `GIT_AI_API_KEY` (also supports `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`)
-- `GIT_AI_TIMEOUT_MS` (request timeout, default 120000)
-- `GIT_AI_MAX_DIFF_CHARS` (diff truncation length)
-- `GIT_AI_MAX_OUTPUT_TOKENS` (output token limit)
-- `GIT_AI_AUTO_AGENT=0` (disable auto Agent; `-a` still forces it)
-- `GIT_AI_DISABLE_AGENT=1` (disable Agent completely)
-- `GIT_AI_RECENT_COMMITS_ALL=1` (recent commits not limited by author)
-- `GIT_AI_RECENT_COMMITS_FALLBACK=0` (disable no-author fallback)
-- `GIT_AI_DISABLE_UPDATE=1` (disable update check)
-- `GIT_AI_UPDATE_INTERVAL_HOURS=24` (update check interval in hours)
-- `GIT_AI_MSG_DELIM=<<<GIT_AI_END>>>` (delimiter for `git-ai msg -n`)
-- `GIT_AI_DEBUG=1` (print more error details)
+- `GIT_AI_API_KEY` (also `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`)
+- `GIT_AI_TIMEOUT_MS`
+- `GIT_AI_MAX_DIFF_CHARS` / `GIT_AI_MAX_OUTPUT_TOKENS`
+- `GIT_AI_RULES_PRESET`
+- `GIT_AI_FALLBACK_MODELS`
+- `GIT_AI_POLICY_STRICT`
+- `GIT_AI_ISSUE_PATTERN` / `GIT_AI_ISSUE_PLACEMENT` / `GIT_AI_REQUIRE_ISSUE`
+- `GIT_AI_OUTPUT_FORMAT=json`
+- `GIT_AI_MSG_DELIM=<<<GIT_AI_END>>>`
+- `GIT_AI_HOOK_STRICT=1` / `GIT_AI_HOOK_FALLBACK=0`
 
-OpenCommit-compatible env vars:
-- `OCO_AI_PROVIDER` / `OCO_MODEL` / `OCO_API_KEY`
-- `OCO_TOKENS_MAX_INPUT` / `OCO_TOKENS_MAX_OUTPUT`
+---
 
-### Ignore File `.git-aiignore`
-Exclude specific files from AI analysis (syntax similar to `.gitignore`):
+## 🧩 Ignore File `.git-aiignore`
 
 ```text
 package-lock.json
@@ -143,89 +197,37 @@ dist/
 *.min.js
 ```
 
-Also compatible with OpenCommit's `.opencommitignore` (both will be read).
+Also compatible with `.opencommitignore`.
 
-### Troubleshooting
+---
+
+## ❓Troubleshooting
 
 **1) 401 / Invalid API key**
-- Check effective config: `git-ai config get --json --local`
-- Make sure env vars aren't overriding your key: `GIT_AI_API_KEY / DEEPSEEK_API_KEY / OPENAI_API_KEY / OCO_API_KEY`
+- `git-ai config get --json --local`
+- Check env overrides
 
 **2) Diff truncated**
-- Ignore large files via `.git-aiignore` / `.opencommitignore`
-- Or set `GIT_AI_MAX_DIFF_CHARS` (also supports `OCO_TOKENS_MAX_INPUT`)
+- Ignore large files via `.git-aiignore`
+- Or set `GIT_AI_MAX_DIFF_CHARS`
 
-**3) Agent falls back to basic mode**
-- Set `GIT_AI_DEBUG=1` to see the real failure reason (timeout/rate limit/auth, etc.)
-
----
-
-## 📖 Usage
-
-### Scenario 1: Interactive
-```bash
-git add .
-git-ai
-```
-
-### Scenario 2: Git Hook (Recommended) 🌟
-The smoothest experience. Install once, use forever.
-
-```bash
-# Install for current project
-git-ai hook install
-
-# Or install globally (for all projects)
-git-ai hook install --global
-```
-
-**Then just run:**
-```bash
-git checkout -b feature/awesome-login
-# ... write code ...
-git add .
-git commit  # ✨ AI generates "feat(login): implement awesome login logic"
-```
-
-### Scenario 3: Generate Reports
-Hate writing weekly reports?
-
-```bash
-# Generate report for this week
-git-ai report
-
-# Generate report for the last 30 days
-git-ai report --days 30
-
-# Specify date range
-git-ai report --from 2025-01-01 --to 2025-01-31
-
-# JSON output (for scripts)
-git-ai report --days 7 --json
-```
+**3) Agent falls back**
+- Set `GIT_AI_DEBUG=1` to see reasons
 
 ---
 
-## 🛠 Command Reference
+## 🤖 Supported Models
 
-| Command | Alias | Description |
-|---------|-------|-------------|
-| `git-ai init` | `config` | **Initialize Config** (Provider, Key, Language) |
-| `git-ai config get` | | Show effective config (supports `--json` / `--local`) |
-| `git-ai config set <key> <value>` | | Set config (supports `--local` / `--json`) |
-| `git-ai config describe` | | List config keys and env overrides |
-| `git-ai` | | Interactive generation & commit |
-| `git-ai -a` | | **Agent Mode** (Deep analysis & Impact check) |
-| `git-ai -y` | | Skip confirmation and commit directly |
-| `git-ai -n 3` | | Generate 3 options to choose from |
-| `git-ai -l en` | | Force language (en/zh) |
-| `git-ai hook install` | | **Install Git Hook** (supports `--global`) |
-| `git-ai report` | | **Generate AI Report** (supports `--days`) |
-| `git-ai msg` | | Generate message only (stdout for scripts) |
+| Type | Provider | Notes | Setup |
+|------|----------|------|-------|
+| **Local** | **Ollama** | Offline & private | `git-ai init` auto-detect |
+| | **LM Studio** | Good compatibility | Manual URL |
+| **CN** | **DeepSeek** | High value | API Key |
+| | **Qwen** | Long context | API Key |
+| | **Zhipu/Moonshot** | Popular in CN | API Key |
+| **Global** | **OpenAI** | Baseline GPT-4o | API Key |
 
 ---
-
-Tip: `git-ai msg -n` uses `<<<GIT_AI_END>>>` as the default delimiter; prefer `--json` for scripts.
 
 ## 📄 License
 

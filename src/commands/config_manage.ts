@@ -2,7 +2,8 @@ import chalk from 'chalk';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getConfigPath, getMergedConfig, getLocalConfigError, setConfig } from '../utils/config.js';
-import type { AIConfig } from '../types.js';
+import { validateCommitRules } from '../utils/ai.js';
+import type { AIConfig, CommitPolicy, CommitRules } from '../types.js';
 
 export interface ConfigGetOptions {
   json?: boolean;
@@ -46,6 +47,75 @@ function maskSecret(secret: unknown): string {
 }
 
 function parseValue(key: string, value: string): unknown {
+  if (key === 'rules') {
+    const trimmed = value.trim();
+    let raw = trimmed;
+    if (trimmed.startsWith('@')) {
+      const filePath = trimmed.slice(1);
+      if (!filePath) return value;
+      try {
+        raw = readFileSync(filePath, 'utf-8');
+      } catch {
+        return value;
+      }
+    }
+    try {
+      const parsed = JSON.parse(raw) as CommitRules;
+      const { errors } = validateCommitRules(parsed);
+      if (errors.length) return value;
+      return parsed;
+    } catch {
+      return value;
+    }
+  }
+  if (key === 'policy') {
+    const trimmed = value.trim();
+    let raw = trimmed;
+    if (trimmed.startsWith('@')) {
+      const filePath = trimmed.slice(1);
+      if (!filePath) return value;
+      try {
+        raw = readFileSync(filePath, 'utf-8');
+      } catch {
+        return value;
+      }
+    }
+    try {
+      const parsed = JSON.parse(raw) as CommitPolicy;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return value;
+      if ('strict' in parsed && typeof parsed.strict !== 'boolean') return value;
+      return parsed;
+    } catch {
+      return value;
+    }
+  }
+  if (key === 'fallbackModels') {
+    const trimmed = value.trim();
+    let raw = trimmed;
+    if (trimmed.startsWith('@')) {
+      const filePath = trimmed.slice(1);
+      if (!filePath) return value;
+      try {
+        raw = readFileSync(filePath, 'utf-8');
+      } catch {
+        return value;
+      }
+    }
+    if (raw.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((m) => typeof m === 'string' && m.trim()).map((m) => m.trim());
+        }
+      } catch {
+        return value;
+      }
+    }
+    return raw
+      .split(',')
+      .map((m) => m.trim())
+      .filter(Boolean);
+  }
   if (key === 'enableFooter') {
     const normalized = value.trim().toLowerCase();
     if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) return true;
@@ -64,7 +134,12 @@ function isValidKey(key: string): key is keyof AIConfig {
     key === 'agentModel' ||
     key === 'locale' ||
     key === 'customPrompt' ||
-    key === 'enableFooter'
+    key === 'enableFooter' ||
+    key === 'outputFormat' ||
+    key === 'rules' ||
+    key === 'rulesPreset' ||
+    key === 'fallbackModels' ||
+    key === 'policy'
   );
 }
 
@@ -87,6 +162,11 @@ export function runConfigDescribe(options: { json?: boolean } = {}): void {
       'locale',
       'customPrompt',
       'enableFooter',
+      'outputFormat',
+      'rules',
+      'rulesPreset',
+      'fallbackModels',
+      'policy',
     ],
     env: {
       provider: ['GIT_AI_PROVIDER', 'OCO_AI_PROVIDER'],
@@ -97,6 +177,11 @@ export function runConfigDescribe(options: { json?: boolean } = {}): void {
       locale: ['GIT_AI_LOCALE'],
       enableFooter: ['GIT_AI_ENABLE_FOOTER'],
       customPrompt: ['GIT_AI_CUSTOM_PROMPT'],
+      outputFormat: ['GIT_AI_OUTPUT_FORMAT'],
+      rulesPreset: ['GIT_AI_RULES_PRESET'],
+      fallbackModels: ['GIT_AI_FALLBACK_MODELS'],
+      policy: ['GIT_AI_POLICY_STRICT'],
+      issue: ['GIT_AI_ISSUE_PATTERN', 'GIT_AI_ISSUE_PLACEMENT', 'GIT_AI_REQUIRE_ISSUE'],
       maxDiffChars: ['GIT_AI_MAX_DIFF_CHARS', 'OCO_TOKENS_MAX_INPUT (approx)'],
       maxOutputTokens: ['GIT_AI_MAX_OUTPUT_TOKENS', 'OCO_TOKENS_MAX_OUTPUT'],
       timeoutMs: ['GIT_AI_TIMEOUT_MS'],
@@ -105,6 +190,7 @@ export function runConfigDescribe(options: { json?: boolean } = {}): void {
       recentCommits: ['GIT_AI_RECENT_COMMITS_ALL', 'GIT_AI_RECENT_COMMITS_FALLBACK'],
       updateCheck: ['GIT_AI_DISABLE_UPDATE', 'GIT_AI_NO_UPDATE', 'GIT_AI_UPDATE_INTERVAL_HOURS'],
       msgDelimiter: ['GIT_AI_MSG_DELIM'],
+      hook: ['GIT_AI_HOOK_STRICT', 'GIT_AI_HOOK_FALLBACK', 'GIT_AI_DISABLED'],
     },
   };
 
@@ -154,7 +240,9 @@ export function runConfigGet(options: ConfigGetOptions = {}): void {
   console.log(chalk.cyan('\nEffective config:'));
   Object.entries(payload.effective).forEach(([k, v]) => {
     if (v === undefined || v === '') return;
-    console.log(chalk.gray(`  ${k}: ${String(v)}`));
+    const rendered =
+      v && typeof v === 'object' ? JSON.stringify(v, null, 2).replace(/\n/g, '\n  ') : String(v);
+    console.log(chalk.gray(`  ${k}: ${rendered}`));
   });
 
   if (options.local) {
@@ -162,7 +250,11 @@ export function runConfigGet(options: ConfigGetOptions = {}): void {
     if (Object.keys(local).length === 0) {
       console.log(chalk.gray('  (not set)'));
     } else {
-      Object.entries(local).forEach(([k, v]) => console.log(chalk.gray(`  ${k}: ${String(v)}`)));
+      Object.entries(local).forEach(([k, v]) => {
+        const rendered =
+          v && typeof v === 'object' ? JSON.stringify(v, null, 2).replace(/\n/g, '\n  ') : String(v);
+        console.log(chalk.gray(`  ${k}: ${rendered}`));
+      });
     }
   }
   console.log('');
@@ -180,6 +272,54 @@ export function runConfigSet(key: string, value: string, options: ConfigSetOptio
   }
 
   const parsedValue = parseValue(key, value);
+  if (key === 'rules') {
+    if (typeof parsedValue === 'string') {
+      const msg =
+        'Invalid rules JSON. Use: git-ai config set rules \'{"types":["feat","fix"]}\' or @path/to/rules.json';
+      if (options.json) {
+        console.log(JSON.stringify({ success: false, error: msg }, null, 2));
+      } else {
+        console.error(chalk.red(`✗ ${msg}`));
+      }
+      process.exit(1);
+    }
+    const { errors, warnings } = validateCommitRules(parsedValue);
+    if (errors.length) {
+      const msg = `Invalid rules: ${errors.join('; ')}`;
+      if (options.json) {
+        console.log(JSON.stringify({ success: false, error: msg }, null, 2));
+      } else {
+        console.error(chalk.red(`✗ ${msg}`));
+      }
+      process.exit(1);
+    }
+    if (warnings.length && !options.json) {
+      console.log(chalk.yellow(`⚠️  Rules warnings: ${warnings.join('; ')}`));
+    }
+  }
+  if (key === 'policy') {
+    if (typeof parsedValue === 'string') {
+      const msg = 'Invalid policy JSON. Use: git-ai config set policy \'{"strict":true}\'';
+      if (options.json) {
+        console.log(JSON.stringify({ success: false, error: msg }, null, 2));
+      } else {
+        console.error(chalk.red(`✗ ${msg}`));
+      }
+      process.exit(1);
+    }
+  }
+  if (key === 'fallbackModels') {
+    if (typeof parsedValue === 'string') {
+      const msg =
+        'Invalid fallbackModels. Use: git-ai config set fallbackModels "modelA,modelB" or @path/to/list.json';
+      if (options.json) {
+        console.log(JSON.stringify({ success: false, error: msg }, null, 2));
+      } else {
+        console.error(chalk.red(`✗ ${msg}`));
+      }
+      process.exit(1);
+    }
+  }
 
   if (options.local) {
     const data = safeReadLocalConfig();
