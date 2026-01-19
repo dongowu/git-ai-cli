@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getConfigPath, getMergedConfig, getLocalConfigError, setConfig } from '../utils/config.js';
 import { validateCommitRules } from '../utils/ai.js';
-import type { AIConfig, CommitPolicy, CommitRules } from '../types.js';
+import type { AIConfig, BranchConfig, CommitPolicy, CommitRules } from '../types.js';
 
 export interface ConfigGetOptions {
   json?: boolean;
@@ -116,6 +116,38 @@ function parseValue(key: string, value: string): unknown {
       .map((m) => m.trim())
       .filter(Boolean);
   }
+  if (key === 'branch') {
+    const trimmed = value.trim();
+    let raw = trimmed;
+    if (trimmed.startsWith('@')) {
+      const filePath = trimmed.slice(1);
+      if (!filePath) return value;
+      try {
+        raw = readFileSync(filePath, 'utf-8');
+      } catch {
+        return value;
+      }
+    }
+    try {
+      const parsed = JSON.parse(raw) as BranchConfig;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return value;
+      if (
+        'types' in parsed &&
+        (!Array.isArray(parsed.types) ||
+          parsed.types.some((t) => typeof t !== 'string' || !t.trim()))
+      ) {
+        return value;
+      }
+      if ('pattern' in parsed && typeof parsed.pattern !== 'string') return value;
+      if ('issueSeparator' in parsed && typeof parsed.issueSeparator !== 'string') return value;
+      if ('nameMaxLength' in parsed) {
+        if (typeof parsed.nameMaxLength !== 'number' || !Number.isFinite(parsed.nameMaxLength)) return value;
+      }
+      return parsed;
+    } catch {
+      return value;
+    }
+  }
   if (key === 'enableFooter') {
     const normalized = value.trim().toLowerCase();
     if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) return true;
@@ -139,7 +171,8 @@ function isValidKey(key: string): key is keyof AIConfig {
     key === 'rules' ||
     key === 'rulesPreset' ||
     key === 'fallbackModels' ||
-    key === 'policy'
+    key === 'policy' ||
+    key === 'branch'
   );
 }
 
@@ -167,6 +200,7 @@ export function runConfigDescribe(options: { json?: boolean } = {}): void {
       'rulesPreset',
       'fallbackModels',
       'policy',
+      'branch',
     ],
     env: {
       provider: ['GIT_AI_PROVIDER', 'OCO_AI_PROVIDER'],
@@ -182,6 +216,12 @@ export function runConfigDescribe(options: { json?: boolean } = {}): void {
       fallbackModels: ['GIT_AI_FALLBACK_MODELS'],
       policy: ['GIT_AI_POLICY_STRICT'],
       issue: ['GIT_AI_ISSUE_PATTERN', 'GIT_AI_ISSUE_PLACEMENT', 'GIT_AI_REQUIRE_ISSUE'],
+      branch: [
+        'GIT_AI_BRANCH_PATTERN',
+        'GIT_AI_BRANCH_TYPES',
+        'GIT_AI_BRANCH_ISSUE_SEPARATOR',
+        'GIT_AI_BRANCH_NAME_MAXLEN',
+      ],
       maxDiffChars: ['GIT_AI_MAX_DIFF_CHARS', 'OCO_TOKENS_MAX_INPUT (approx)'],
       maxOutputTokens: ['GIT_AI_MAX_OUTPUT_TOKENS', 'OCO_TOKENS_MAX_OUTPUT'],
       timeoutMs: ['GIT_AI_TIMEOUT_MS'],
@@ -312,6 +352,18 @@ export function runConfigSet(key: string, value: string, options: ConfigSetOptio
     if (typeof parsedValue === 'string') {
       const msg =
         'Invalid fallbackModels. Use: git-ai config set fallbackModels "modelA,modelB" or @path/to/list.json';
+      if (options.json) {
+        console.log(JSON.stringify({ success: false, error: msg }, null, 2));
+      } else {
+        console.error(chalk.red(`✗ ${msg}`));
+      }
+      process.exit(1);
+    }
+  }
+  if (key === 'branch') {
+    if (typeof parsedValue === 'string') {
+      const msg =
+        'Invalid branch JSON. Use: git-ai config set branch \'{"types":["feat","fix"],"pattern":"{type}/{name}"}\'';
       if (options.json) {
         console.log(JSON.stringify({ success: false, error: msg }, null, 2));
       } else {

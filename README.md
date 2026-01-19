@@ -73,6 +73,12 @@ git-ai init
     "issuePlacement": "footer",
     "issueFooterPrefix": "Refs",
     "requireIssue": false
+  },
+  "branch": {
+    "types": ["feat", "fix", "docs"],
+    "pattern": "{type}/{issue?}{name}",
+    "issueSeparator": "-",
+    "nameMaxLength": 50
   }
 }
 ```
@@ -97,7 +103,12 @@ GIT_AI_HOOK_FALLBACK=0 git commit
 git-ai msg --json
 ```
 
-6) **PR / Release / Report**
+6) **创建分支（交互式）**
+```bash
+git-ai branch
+```
+
+7) **PR / Release / Report**
 ```bash
 # PR 描述
 git-ai pr --base main --head HEAD
@@ -133,12 +144,17 @@ git-ai release --from v1.0.0 --to HEAD
 - `fallbackModels`: 主模型失败时的回退模型列表
 - `policy.strict`: 是否阻断不合规提交
 - `rules`: 提交规范（类型、scope、长度、issue 等）
+- `branch`: 分支规范（类型、pattern、长度等）
 
 ### 规则与策略
 - `issuePattern`: 任务号正则（如 `PROJ-123` / `#123`）
 - `issuePlacement`: `scope | subject | footer`
 - `requireIssue`: 是否必须包含任务号
 - `policy.strict`: 不合规则阻断提交
+- `branch.pattern`: 分支模板（如 `{type}/{issue?}{name}`）
+- `branch.types`: 分支类型列表
+- `branch.issueSeparator`: issue 分隔符（默认 `-`）
+- `branch.nameMaxLength`: 分支名长度上限
 
 ### CLI 设置（可脚本化）
 ```bash
@@ -153,6 +169,9 @@ git-ai config set fallbackModels "deepseek-chat,qwen-turbo"
 # 设置规则（JSON 或 @文件）
 git-ai config set rules '{"types":["feat","fix"]}'
 git-ai config set rules @rules.json --local
+
+# 设置分支规则
+git-ai config set branch '{"types":["feat","fix"],"pattern":"{type}/{issue?}{name}"}'
 ```
 
 ---
@@ -166,6 +185,7 @@ git-ai config set rules @rules.json --local
 | `git-ai` / `git-ai commit` | 交互式提交 |
 | `git-ai -a` | Agent 模式 |
 | `git-ai msg` | 仅输出消息（脚本/Hook） |
+| `git-ai branch` | 交互式创建分支 |
 | `git-ai hook install/remove` | Git Hook 管理 |
 | `git-ai report` | 生成 AI 周报 |
 | `git-ai pr` | 生成 PR 描述 |
@@ -186,6 +206,8 @@ git-ai config set rules @rules.json --local
 - `GIT_AI_OUTPUT_FORMAT=json`
 - `GIT_AI_MSG_DELIM=<<<GIT_AI_END>>>`
 - `GIT_AI_HOOK_STRICT=1` / `GIT_AI_HOOK_FALLBACK=0`
+- `GIT_AI_BRANCH_PATTERN` / `GIT_AI_BRANCH_TYPES`
+- `GIT_AI_BRANCH_ISSUE_SEPARATOR` / `GIT_AI_BRANCH_NAME_MAXLEN`
 
 ---
 
