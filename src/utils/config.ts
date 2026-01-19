@@ -39,6 +39,26 @@ const config = new Conf<AIConfig>({
       type: 'boolean',
       default: true,
     },
+    outputFormat: {
+      type: 'string',
+      default: 'text',
+    },
+    rules: {
+      type: 'object',
+      default: {},
+    },
+    rulesPreset: {
+      type: 'string',
+      default: '',
+    },
+    fallbackModels: {
+      type: 'array',
+      default: [],
+    },
+    policy: {
+      type: 'object',
+      default: {},
+    },
   },
 });
 
@@ -103,6 +123,47 @@ function getEnvConfig(baseProvider?: string): Partial<AIConfig> {
   const enableFooter = parseBooleanEnv(process.env.GIT_AI_ENABLE_FOOTER);
   if (enableFooter !== undefined) env.enableFooter = enableFooter;
 
+  const outputFormat = process.env.GIT_AI_OUTPUT_FORMAT;
+  if (outputFormat === 'json' || outputFormat === 'text') {
+    env.outputFormat = outputFormat as 'json' | 'text';
+  }
+
+  const rulesPreset = process.env.GIT_AI_RULES_PRESET;
+  if (rulesPreset) env.rulesPreset = rulesPreset;
+
+  const fallbackModelsRaw = process.env.GIT_AI_FALLBACK_MODELS;
+  if (fallbackModelsRaw) {
+    const models = fallbackModelsRaw
+      .split(',')
+      .map((m) => m.trim())
+      .filter(Boolean);
+    if (models.length) env.fallbackModels = models;
+  }
+
+  const policyStrict = parseBooleanEnv(process.env.GIT_AI_POLICY_STRICT);
+  if (policyStrict !== undefined) {
+    env.policy = { ...(env.policy || {}), strict: policyStrict };
+  }
+
+  const issuePattern = process.env.GIT_AI_ISSUE_PATTERN;
+  if (issuePattern) {
+    env.rules = { ...(env.rules || {}), issuePattern };
+  }
+
+  const issuePlacement = process.env.GIT_AI_ISSUE_PLACEMENT as
+    | 'scope'
+    | 'subject'
+    | 'footer'
+    | undefined;
+  if (issuePlacement === 'scope' || issuePlacement === 'subject' || issuePlacement === 'footer') {
+    env.rules = { ...(env.rules || {}), issuePlacement };
+  }
+
+  const requireIssue = parseBooleanEnv(process.env.GIT_AI_REQUIRE_ISSUE);
+  if (requireIssue !== undefined) {
+    env.rules = { ...(env.rules || {}), requireIssue };
+  }
+
   return env;
 }
 
@@ -116,12 +177,23 @@ export function getMergedConfig(): Partial<AIConfig> {
     locale: config.get('locale'),
     customPrompt: config.get('customPrompt'),
     enableFooter: config.get('enableFooter'),
+    outputFormat: config.get('outputFormat'),
+    rules: config.get('rules'),
+    rulesPreset: config.get('rulesPreset'),
+    fallbackModels: config.get('fallbackModels'),
+    policy: config.get('policy'),
   };
 
   const localConfig = getLocalConfig();
   const merged = { ...globalConfig, ...localConfig };
   const envConfig = getEnvConfig(merged.provider);
   const finalConfig = { ...merged, ...envConfig };
+  if (merged.rules || envConfig.rules) {
+    finalConfig.rules = { ...(merged.rules || {}), ...(envConfig.rules || {}) };
+  }
+  if (merged.policy || envConfig.policy) {
+    finalConfig.policy = { ...(merged.policy || {}), ...(envConfig.policy || {}) };
+  }
   return finalConfig;
 }
 

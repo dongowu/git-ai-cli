@@ -12,6 +12,7 @@ import {
 import {
   createAIClient,
   generateCommitMessage,
+  validateCommitRules,
   type CommitMessageGenerationInput,
 } from '../utils/ai.js';
 
@@ -85,10 +86,23 @@ export async function runMsg(options: MsgOptions = {}): Promise<void> {
       console.log(chalk.yellow(`⚠️  ${warning}`));
     }
   }
+  const rulesIssues = validateCommitRules(config.rules);
+  if (rulesIssues.errors.length || rulesIssues.warnings.length) {
+    const warning = `Rules config issues: ${[...rulesIssues.errors, ...rulesIssues.warnings].join(
+      '; '
+    )}`;
+    warnings.push(warning);
+    if (!json && !quiet) {
+      console.log(chalk.yellow(`⚠️  ${warning}`));
+    }
+  }
 
   // Override locale if provided
   if (locale && (locale === 'zh' || locale === 'en')) {
     config.locale = locale as 'zh' | 'en';
+  }
+  if (json && process.env.GIT_AI_ENABLE_FOOTER === undefined) {
+    config.enableFooter = false;
   }
 
   // Get filtered diff

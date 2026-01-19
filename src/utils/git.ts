@@ -357,6 +357,69 @@ export async function getCommitsInRange(options: {
   }
 }
 
+export async function getCommitsBetween(base: string, head: string): Promise<string[]> {
+  try {
+    const range = `${base}..${head}`;
+    const { stdout } = await execa('git', [
+      'log',
+      '--pretty=format:%h %cd %s',
+      '--date=short',
+      '--no-merges',
+      range,
+    ]);
+    return stdout.split('\n').filter((line) => line.trim());
+  } catch {
+    return [];
+  }
+}
+
+export async function getDiffStat(base: string, head: string): Promise<string> {
+  try {
+    const range = `${base}..${head}`;
+    const { stdout } = await execa('git', ['diff', '--stat', range]);
+    return stdout.trim();
+  } catch {
+    return '';
+  }
+}
+
+async function refExists(ref: string): Promise<boolean> {
+  try {
+    await execa('git', ['show-ref', '--verify', '--quiet', ref]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function getDefaultBaseBranch(): Promise<string | null> {
+  try {
+    const { stdout } = await execa('git', ['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD']);
+    const ref = stdout.trim();
+    if (ref.startsWith('refs/remotes/origin/')) {
+      return ref.replace('refs/remotes/origin/', 'origin/');
+    }
+  } catch {
+    // ignore
+  }
+
+  const candidates = ['main', 'master'];
+  for (const name of candidates) {
+    if (await refExists(`refs/heads/${name}`)) return name;
+    if (await refExists(`refs/remotes/origin/${name}`)) return `origin/${name}`;
+  }
+  return null;
+}
+
+export async function getLastTag(): Promise<string | null> {
+  try {
+    const { stdout } = await execa('git', ['describe', '--tags', '--abbrev=0']);
+    return stdout.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function searchCode(pattern: string): Promise<string> {
   try {
     // Use git grep to search in tracked files (it's faster and respects .gitignore)

@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { getConfig, getLocalConfigError } from '../utils/config.js';
 import { isGitInstalled, isInGitRepo, getRecentCommits, getCommitsInRange } from '../utils/git.js';
-import { createAIClient, generateWeeklyReport } from '../utils/ai.js';
+import { createAIClient, generateWeeklyReport, validateCommitRules } from '../utils/ai.js';
 
 type ReportOptions = { days?: number; from?: string; to?: string; json?: boolean };
 
@@ -38,6 +38,16 @@ export async function runReport(options: ReportOptions = {}): Promise<void> {
   const warnings: string[] = [];
   if (localConfigError) {
     const warning = `Failed to parse ${localConfigError.path}: ${localConfigError.error}`;
+    warnings.push(warning);
+    if (!options.json) {
+      console.log(chalk.yellow(`⚠️  ${warning}`));
+    }
+  }
+  const rulesIssues = validateCommitRules(config.rules);
+  if (rulesIssues.errors.length || rulesIssues.warnings.length) {
+    const warning = `Rules config issues: ${[...rulesIssues.errors, ...rulesIssues.warnings].join(
+      '; '
+    )}`;
     warnings.push(warning);
     if (!options.json) {
       console.log(chalk.yellow(`⚠️  ${warning}`));
