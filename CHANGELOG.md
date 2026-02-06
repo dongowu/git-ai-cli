@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.1] - 2026-02-06
+
+### 🛠 Installation Reliability
+
+- **npmjs Fallback for Platform Binary**: `install.cjs` now auto-installs the missing platform package from `https://registry.npmjs.org/` when mirror registries do not have `@dongowu/git-ai-cli-*` artifacts.
+- **Better Error Guidance**: Installation now prints detected registry and an explicit retry command when fallback install fails.
+
 ## [2.0.0] - 2026-02-06
 
 ### 🦀 Rust Rewrite Upgrade (v1.0.21 -> v2.0.0)
