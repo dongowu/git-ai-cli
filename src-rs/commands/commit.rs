@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::utils::{ConfigManager, GitManager};
+use crate::utils::{ConfigManager, GitManager, CopilotCLI};
 use crate::utils::agent_lite::AgentLite;
 use crate::utils::ai::{AIClient, PromptTemplates};
 use dialoguer::{MultiSelect, Select};
@@ -11,6 +11,7 @@ pub async fn run(
     num: usize,
     locale_override: Option<String>,
     agent: bool,
+    copilot: bool,
 ) -> Result<()> {
     // Get staged files (offer interactive staging if empty)
     let mut staged_files = GitManager::get_staged_files()?;
@@ -137,6 +138,59 @@ pub async fn run(
     };
 
     pb.finish_and_clear();
+
+    // Stage 2: GitHub Copilot CLI Deep Analysis (if enabled)
+    if copilot && CopilotCLI::is_available() {
+        println!("\n🔍 Analyzing code impact with GitHub Copilot CLI...\n");
+
+        match CopilotCLI::analyze_code_impact(&truncated_diff, &staged_files).await {
+            Ok(analysis) => {
+                // Display impact summary
+                println!("📊 Impact Analysis:");
+                println!("   {}\n", analysis.impact_summary);
+
+                // Display potential issues
+                if !analysis.potential_issues.is_empty() {
+                    println!("⚠️  Potential Risks:");
+                    for issue in &analysis.potential_issues {
+                        println!("   • {}", issue);
+                    }
+                    println!();
+                }
+
+                // Display affected areas
+                if !analysis.affected_areas.is_empty() {
+                    println!("🔗 Affected Areas:");
+                    for area in &analysis.affected_areas {
+                        println!("   • {}", area);
+                    }
+                    println!();
+                }
+
+                // Display test recommendations
+                if !analysis.test_recommendations.is_empty() {
+                    println!("✅ Test Recommendations:");
+                    for test in &analysis.test_recommendations {
+                        println!("   • {}", test);
+                    }
+                    println!();
+                }
+
+                // Ask user if they want to continue
+                if !analysis.potential_issues.is_empty() {
+                    println!("⚠️  Warning: Potential issues detected. Review carefully before committing.\n");
+                }
+            }
+            Err(e) => {
+                eprintln!("⚠️  Copilot analysis failed: {}", e);
+                eprintln!("    Continuing with commit...\n");
+            }
+        }
+    } else if copilot {
+        eprintln!("⚠️  GitHub Copilot CLI not available.");
+        eprintln!("    Install with: gh auth login");
+        eprintln!("    Continuing without analysis...\n");
+    }
 
     // Interactive loop
     let mut current_messages = messages;
