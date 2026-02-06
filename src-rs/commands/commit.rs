@@ -1,7 +1,7 @@
 use crate::error::Result;
-use crate::utils::{ConfigManager, GitManager};
 use crate::utils::agent_lite::AgentLite;
 use crate::utils::ai::{AIClient, PromptTemplates};
+use crate::utils::{ConfigManager, CopilotCLI, GitManager};
 use dialoguer::{MultiSelect, Select};
 use indicatif::ProgressBar;
 use std::collections::HashSet;
@@ -11,6 +11,7 @@ pub async fn run(
     num: usize,
     locale_override: Option<String>,
     agent: bool,
+    copilot: bool,
 ) -> Result<()> {
     // Get staged files (offer interactive staging if empty)
     let mut staged_files = GitManager::get_staged_files()?;
@@ -131,12 +132,67 @@ pub async fn run(
             .generate_multiple_messages(&system_prompt, &user_prompt, num)
             .await?
     } else {
-        vec![ai_client
-            .generate_commit_message(&system_prompt, &user_prompt)
-            .await?]
+        vec![
+            ai_client
+                .generate_commit_message(&system_prompt, &user_prompt)
+                .await?,
+        ]
     };
 
     pb.finish_and_clear();
+
+    // Stage 2: GitHub Copilot CLI Deep Analysis (if enabled)
+    if copilot && CopilotCLI::is_available() {
+        println!("\n🔍 Analyzing code impact with GitHub Copilot CLI...\n");
+
+        match CopilotCLI::analyze_code_impact(&truncated_diff, &staged_files).await {
+            Ok(analysis) => {
+                // Display impact summary
+                println!("📊 Impact Analysis:");
+                println!("   {}\n", analysis.impact_summary);
+
+                // Display potential issues
+                if !analysis.potential_issues.is_empty() {
+                    println!("⚠️  Potential Risks:");
+                    for issue in &analysis.potential_issues {
+                        println!("   • {}", issue);
+                    }
+                    println!();
+                }
+
+                // Display affected areas
+                if !analysis.affected_areas.is_empty() {
+                    println!("🔗 Affected Areas:");
+                    for area in &analysis.affected_areas {
+                        println!("   • {}", area);
+                    }
+                    println!();
+                }
+
+                // Display test recommendations
+                if !analysis.test_recommendations.is_empty() {
+                    println!("✅ Test Recommendations:");
+                    for test in &analysis.test_recommendations {
+                        println!("   • {}", test);
+                    }
+                    println!();
+                }
+
+                // Ask user if they want to continue
+                if !analysis.potential_issues.is_empty() {
+                    println!("⚠️  Warning: Potential issues detected. Review carefully before committing.\n");
+                }
+            }
+            Err(e) => {
+                eprintln!("⚠️  Copilot analysis failed: {}", e);
+                eprintln!("    Continuing with commit...\n");
+            }
+        }
+    } else if copilot {
+        eprintln!("⚠️  GitHub Copilot CLI not available.");
+        eprintln!("    Install with: gh auth login");
+        eprintln!("    Continuing without analysis...\n");
+    }
 
     // Interactive loop
     let mut current_messages = messages;
@@ -199,9 +255,11 @@ pub async fn run(
                         .generate_multiple_messages(&system_prompt, &user_prompt, num)
                         .await?
                 } else {
-                    vec![ai_client
-                        .generate_commit_message(&system_prompt, &user_prompt)
-                        .await?]
+                    vec![
+                        ai_client
+                            .generate_commit_message(&system_prompt, &user_prompt)
+                            .await?,
+                    ]
                 };
 
                 pb.finish_and_clear();
@@ -225,10 +283,12 @@ fn edit_message(original: &str) -> Result<String> {
     let temp_file = temp_dir.join("git-ai-commit-msg.txt");
 
     // Write original message to temp file
-    let mut file = std::fs::File::create(&temp_file)
-        .map_err(|e| crate::error::GitAiError::Other(format!("Failed to create temp file: {}", e)))?;
-    file.write_all(original.as_bytes())
-        .map_err(|e| crate::error::GitAiError::Other(format!("Failed to write temp file: {}", e)))?;
+    let mut file = std::fs::File::create(&temp_file).map_err(|e| {
+        crate::error::GitAiError::Other(format!("Failed to create temp file: {}", e))
+    })?;
+    file.write_all(original.as_bytes()).map_err(|e| {
+        crate::error::GitAiError::Other(format!("Failed to write temp file: {}", e))
+    })?;
     drop(file);
 
     // Get editor from environment or use default
@@ -249,12 +309,15 @@ fn edit_message(original: &str) -> Result<String> {
         .map_err(|e| crate::error::GitAiError::Other(format!("Failed to open editor: {}", e)))?;
 
     if !status.success() {
-        return Err(crate::error::GitAiError::Other("Editor exited with error".to_string()));
+        return Err(crate::error::GitAiError::Other(
+            "Editor exited with error".to_string(),
+        ));
     }
 
     // Read edited message
-    let edited = std::fs::read_to_string(&temp_file)
-        .map_err(|e| crate::error::GitAiError::Other(format!("Failed to read edited file: {}", e)))?;
+    let edited = std::fs::read_to_string(&temp_file).map_err(|e| {
+        crate::error::GitAiError::Other(format!("Failed to read edited file: {}", e))
+    })?;
 
     // Clean up temp file
     let _ = std::fs::remove_file(&temp_file);

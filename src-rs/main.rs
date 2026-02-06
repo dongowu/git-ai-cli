@@ -1,13 +1,12 @@
 use clap::{Parser, Subcommand};
 use std::process;
 
+mod commands;
 mod error;
 mod types;
-mod commands;
 mod utils;
 
 use error::Result;
-use utils::ConfigManager;
 
 #[derive(Parser)]
 #[command(name = "git-ai")]
@@ -36,6 +35,10 @@ struct Cli {
     /// Force agent mode
     #[arg(short, long)]
     agent: bool,
+
+    /// Use GitHub Copilot CLI for enhancement
+    #[arg(long)]
+    copilot: bool,
 
     /// Output as JSON
     #[arg(long)]
@@ -69,6 +72,9 @@ enum Commands {
 
         #[arg(short, long)]
         agent: bool,
+
+        #[arg(long)]
+        copilot: bool,
     },
 
     /// Generate message only (for hooks/scripts)
@@ -172,47 +178,46 @@ async fn run(cli: Cli) -> Result<()> {
     }
 
     match cli.command {
-        Some(Commands::Commit { yes, num, locale, agent }) => {
-            commands::commit::run(yes, num, locale, agent).await
-        }
-        Some(Commands::Msg { num, json, quiet, locale }) => {
-            commands::msg::run(num, json, quiet, locale).await
-        }
-        Some(Commands::Config { subcommand, local, global: _ }) => {
-            match subcommand {
-                Some(ConfigSubcommand::Get { json, local }) => {
-                    commands::config::run(Some("get".to_string()), local).await
-                }
-                Some(ConfigSubcommand::Set { key: _, value: _, local }) => {
-                    commands::config::run(Some("set".to_string()), local).await
-                }
-                Some(ConfigSubcommand::Describe) => {
-                    commands::config::run(Some("describe".to_string()), false).await
-                }
-                None => {
-                    commands::config::run(None, local).await
-                }
+        Some(Commands::Commit {
+            yes,
+            num,
+            locale,
+            agent,
+            copilot,
+        }) => commands::commit::run(yes, num, locale, agent, copilot).await,
+        Some(Commands::Msg {
+            num,
+            json,
+            quiet,
+            locale,
+        }) => commands::msg::run(num, json, quiet, locale).await,
+        Some(Commands::Config {
+            subcommand,
+            local,
+            global: _,
+        }) => match subcommand {
+            Some(ConfigSubcommand::Get { json: _, local }) => {
+                commands::config::run(Some("get".to_string()), local).await
             }
-        }
-        Some(Commands::Hook { subcommand, global }) => {
-            match subcommand {
-                HookSubcommand::Install => {
-                    commands::hook::run("install".to_string(), global).await
-                }
-                HookSubcommand::Remove => {
-                    commands::hook::run("remove".to_string(), global).await
-                }
-                HookSubcommand::Status => {
-                    commands::hook::run("status".to_string(), global).await
-                }
+            Some(ConfigSubcommand::Set {
+                key: _,
+                value: _,
+                local,
+            }) => commands::config::run(Some("set".to_string()), local).await,
+            Some(ConfigSubcommand::Describe) => {
+                commands::config::run(Some("describe".to_string()), false).await
             }
-        }
-        Some(Commands::Report { days }) => {
-            commands::report::run(days).await
-        }
+            None => commands::config::run(None, local).await,
+        },
+        Some(Commands::Hook { subcommand, global }) => match subcommand {
+            HookSubcommand::Install => commands::hook::run("install".to_string(), global).await,
+            HookSubcommand::Remove => commands::hook::run("remove".to_string(), global).await,
+            HookSubcommand::Status => commands::hook::run("status".to_string(), global).await,
+        },
+        Some(Commands::Report { days }) => commands::report::run(days).await,
         None => {
             // Default: interactive commit
-            commands::commit::run(cli.yes, cli.num, cli.locale, cli.agent).await
+            commands::commit::run(cli.yes, cli.num, cli.locale, cli.agent, cli.copilot).await
         }
     }
 }

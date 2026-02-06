@@ -29,6 +29,18 @@
 
 ---
 
+## 🦀 Rust Edition (Default Release)
+
+Starting from **v2.x**, `git-ai-cli` ships the **Rust edition** by default (faster, single-binary). Install via npm (it will download the correct platform binary automatically):
+
+```bash
+npm install -g @dongowu/git-ai-cli
+```
+
+> The Rust edition currently includes **agent-lite** (impact analysis / symbol search). Advanced security/perf analysis is still being ported.
+
+> If you need the legacy TypeScript (v1.x), pin the version explicitly.
+
 ## 🚀 Quick Start
 
 ```bash
@@ -36,7 +48,7 @@
 npm install -g @dongowu/git-ai-cli
 
 # 2. Initialize (Auto-detects local models or configures API)
-git-ai init
+git-ai config
 
 # 3. Use
 git add .
@@ -197,7 +209,7 @@ git-ai report --days 30
 
 | Command | Alias | Description |
 |---------|-------|-------------|
-| `git-ai init` | `config` | **Initialize Config** (Provider, Key, Language) |
+| `git-ai config` | `config` | **Initialize Config** (Provider, Key, Language) |
 | `git-ai config get` | | Show effective config (supports `--json` / `--local`) |
 | `git-ai config set <key> <value>` | | Set config (supports `--local` / `--json`) |
 | `git-ai config describe` | | List config keys and env overrides |
