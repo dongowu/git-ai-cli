@@ -19,13 +19,13 @@ pub struct AIConfig {
 
 #[derive(Debug, Clone)]
 pub struct ProviderPreset {
-    pub name: String,
     pub base_url: String,
     pub default_model: String,
     pub requires_key: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct FileStat {
     pub file: String,
     pub insertions: u32,
@@ -64,7 +64,6 @@ pub fn get_provider_presets() -> HashMap<&'static str, ProviderPreset> {
     presets.insert(
         "deepseek",
         ProviderPreset {
-            name: "DeepSeek".to_string(),
             base_url: "https://api.deepseek.com/v1".to_string(),
             default_model: "deepseek-chat".to_string(),
             requires_key: true,
@@ -74,7 +73,6 @@ pub fn get_provider_presets() -> HashMap<&'static str, ProviderPreset> {
     presets.insert(
         "qwen",
         ProviderPreset {
-            name: "Qwen".to_string(),
             base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1".to_string(),
             default_model: "qwen-plus".to_string(),
             requires_key: true,
@@ -84,7 +82,6 @@ pub fn get_provider_presets() -> HashMap<&'static str, ProviderPreset> {
     presets.insert(
         "zhipu",
         ProviderPreset {
-            name: "Zhipu".to_string(),
             base_url: "https://open.bigmodel.cn/api/paas/v4".to_string(),
             default_model: "glm-4".to_string(),
             requires_key: true,
@@ -94,7 +91,6 @@ pub fn get_provider_presets() -> HashMap<&'static str, ProviderPreset> {
     presets.insert(
         "moonshot",
         ProviderPreset {
-            name: "Moonshot".to_string(),
             base_url: "https://api.moonshot.cn/v1".to_string(),
             default_model: "moonshot-v1-8k".to_string(),
             requires_key: true,
@@ -105,7 +101,6 @@ pub fn get_provider_presets() -> HashMap<&'static str, ProviderPreset> {
     presets.insert(
         "openai",
         ProviderPreset {
-            name: "OpenAI".to_string(),
             base_url: "https://api.openai.com/v1".to_string(),
             default_model: "gpt-4-turbo".to_string(),
             requires_key: true,
@@ -115,7 +110,6 @@ pub fn get_provider_presets() -> HashMap<&'static str, ProviderPreset> {
     presets.insert(
         "siliconflow",
         ProviderPreset {
-            name: "SiliconFlow".to_string(),
             base_url: "https://api.siliconflow.cn/v1".to_string(),
             default_model: "deepseek-ai/deepseek-v2.5".to_string(),
             requires_key: true,
@@ -126,7 +120,6 @@ pub fn get_provider_presets() -> HashMap<&'static str, ProviderPreset> {
     presets.insert(
         "ollama",
         ProviderPreset {
-            name: "Ollama".to_string(),
             base_url: "http://localhost:11434/v1".to_string(),
             default_model: "llama2".to_string(),
             requires_key: false,
@@ -136,7 +129,6 @@ pub fn get_provider_presets() -> HashMap<&'static str, ProviderPreset> {
     presets.insert(
         "lm-studio",
         ProviderPreset {
-            name: "LM Studio".to_string(),
             base_url: "http://localhost:1234/v1".to_string(),
             default_model: "local-model".to_string(),
             requires_key: false,

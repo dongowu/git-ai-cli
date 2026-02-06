@@ -1,0 +1,16 @@
+{
+  "name": "@dongowu/git-ai-cli-linux-x64",
+  "version": "2.0.0",
+  "description": "git-ai-cli Linux x64 binary",
+  "license": "MIT",
+  "author": "dongowu <dongowu@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dongowu/git-ai-cli"
+  },
+  "os": ["linux"],
+  "cpu": ["x64"],
+  "files": [
+    "bin/git-ai"
+  ]
+}

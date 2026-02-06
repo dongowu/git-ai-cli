@@ -41,7 +41,7 @@ pub async fn run(
 
     // Get branch name and recent commits
     let branch_name = GitManager::get_current_branch().ok();
-    let recent_commits = GitManager::get_recent_commits(5).ok();
+    let recent_commits = GitManager::get_recent_commits(10).ok();
 
     // Create AI client
     let ai_client = AIClient::new(config.clone())?;

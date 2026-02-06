@@ -174,6 +174,7 @@ impl ConfigManager {
     }
 
     /// Get validated config (provider is required)
+    #[allow(dead_code)]
     pub fn get_config() -> Result<AIConfig> {
         let config = Self::get_merged_config()?;
         if config.provider.is_empty() {
@@ -213,6 +214,7 @@ impl ConfigManager {
     }
 
     /// Clear global config
+    #[allow(dead_code)]
     pub fn clear_global_config() -> Result<()> {
         let path = Self::get_global_config_path()?;
         if path.exists() {
@@ -223,6 +225,7 @@ impl ConfigManager {
     }
 
     /// Redact secrets from a string (for error messages)
+    #[allow(dead_code)]
     pub fn redact_secrets(input: &str) -> String {
         let mut result = input.to_string();
 

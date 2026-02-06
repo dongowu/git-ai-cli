@@ -1,8 +1,10 @@
 use crate::error::Result;
 use crate::utils::{ConfigManager, GitManager};
+use crate::utils::agent_lite::AgentLite;
 use crate::utils::ai::{AIClient, PromptTemplates};
-use dialoguer::Select;
+use dialoguer::{MultiSelect, Select};
 use indicatif::ProgressBar;
+use std::collections::HashSet;
 
 pub async fn run(
     yes: bool,
@@ -10,11 +12,48 @@ pub async fn run(
     locale_override: Option<String>,
     agent: bool,
 ) -> Result<()> {
-    // Get staged files
-    let staged_files = GitManager::get_staged_files()?;
+    // Get staged files (offer interactive staging if empty)
+    let mut staged_files = GitManager::get_staged_files()?;
     if staged_files.is_empty() {
-        eprintln!("No staged changes. Stage files with 'git add' first.");
-        return Err(crate::error::GitAiError::NoStagedChanges);
+        let unstaged_files = GitManager::get_unstaged_files()?;
+        if unstaged_files.is_empty() {
+            eprintln!("No changes found. Stage files with 'git add' first.");
+            return Err(crate::error::GitAiError::NoStagedChanges);
+        }
+
+        println!("⚠️  No staged changes found.");
+        let labels: Vec<String> = unstaged_files.iter().map(|f| f.label.clone()).collect();
+        let selections = MultiSelect::new()
+            .with_prompt("Select files to stage")
+            .items(&labels)
+            .interact()
+            .map_err(|e| crate::error::GitAiError::Other(format!("Selection failed: {}", e)))?;
+
+        if selections.is_empty() {
+            println!("No files selected. Exiting.");
+            return Err(crate::error::GitAiError::UserCancelled);
+        }
+
+        let mut all_paths: Vec<String> = Vec::new();
+        for idx in selections {
+            all_paths.extend(unstaged_files[idx].paths.clone());
+        }
+
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut unique_paths: Vec<String> = Vec::new();
+        for path in all_paths {
+            if seen.insert(path.clone()) {
+                unique_paths.push(path);
+            }
+        }
+
+        GitManager::add_files(&unique_paths)?;
+        staged_files = GitManager::get_staged_files()?;
+        println!("✅ Staged {} file(s).", unique_paths.len());
+
+        if staged_files.is_empty() {
+            return Err(crate::error::GitAiError::NoStagedChanges);
+        }
     }
 
     // Show staged files
@@ -41,7 +80,7 @@ pub async fn run(
         .and_then(|s| s.parse::<usize>().ok())
         .unwrap_or(5000);
 
-    let (truncated_diff, truncated) = if diff.len() > max_diff_chars {
+    let (truncated_diff, _truncated) = if diff.len() > max_diff_chars {
         (diff[..max_diff_chars].to_string(), true)
     } else {
         (diff, false)
@@ -49,7 +88,7 @@ pub async fn run(
 
     // Get branch name and recent commits
     let branch_name = GitManager::get_current_branch().ok();
-    let recent_commits = GitManager::get_recent_commits(5).ok();
+    let recent_commits = GitManager::get_recent_commits(10).ok();
 
     // Create AI client
     let ai_client = AIClient::new(config.clone())?;
@@ -61,11 +100,25 @@ pub async fn run(
         config.custom_prompt.as_deref(),
     );
 
-    let user_prompt = PromptTemplates::get_user_prompt(
+    let mut user_prompt = PromptTemplates::get_user_prompt(
         &truncated_diff,
         branch_name.as_deref(),
         recent_commits.as_deref(),
     );
+
+    if agent {
+        match AgentLite::run_analysis(&truncated_diff, branch_name.as_deref()).await {
+            Ok(context) => {
+                if !context.trim().is_empty() {
+                    user_prompt.push_str("\n\n");
+                    user_prompt.push_str(&context);
+                }
+            }
+            Err(err) => {
+                eprintln!("⚠️  Agent-lite failed, falling back to basic mode: {}", err);
+            }
+        }
+    }
 
     // Show progress
     let pb = ProgressBar::new_spinner();

@@ -1,28 +1,49 @@
-# Source files
+# Source files - exclude everything except what's in "files" in package.json
 src/
+src-rs/
+dist/
+target/
+npm/
+npm-platform/
 tsconfig.json
+Cargo.toml
+Cargo.lock
 
 # Development
 *.log
 .DS_Store
 .vscode/
 .idea/
+.claude/
+node_modules/
 
 # Tests
 __tests__/
 *.test.ts
+*.test.js
 *.spec.ts
+*.spec.js
 coverage/
+vitest.config.ts
 
 # Docs (keep README)
 CONTRIBUTING.md
 docs/
+README_EN.md
 
 # Git
 .git/
 .gitignore
+.gitattributes
 
 # CI/CD
 .github/
 .gitlab-ci.yml
 .travis.yml
+
+# Scripts
+scripts/
+
+# TypeScript (no longer needed)
+*.ts
+!*.d.ts

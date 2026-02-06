@@ -34,17 +34,20 @@ pub struct Choice {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct StreamChoice {
     pub delta: Delta,
     pub finish_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct StreamResponse {
     pub choices: Vec<StreamChoice>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct Delta {
     #[serde(default)]
     pub content: Option<String>,
@@ -144,7 +147,7 @@ impl AIClient {
         user_prompt: &str,
         count: usize,
     ) -> Result<Vec<String>> {
-        let mut messages = vec![
+        let messages = vec![
             ChatMessage {
                 role: "system".to_string(),
                 content: system_prompt.to_string(),
