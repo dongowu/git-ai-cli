@@ -11,7 +11,7 @@ use error::Result;
 #[derive(Parser)]
 #[command(name = "git-ai")]
 #[command(about = "Generate git commit messages using AI", long_about = None)]
-#[command(version = "2.0.1")]
+#[command(version = "2.0.2")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,

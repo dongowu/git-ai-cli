@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.2] - 2026-02-06
+
+### 🛠 CLI Launch Reliability
+
+- **Fixed Global Execute Permission**: Marked `bin/git-ai.cjs` as executable so `npm install -g @dongowu/git-ai-cli` no longer fails with `permission denied: git-ai`.
+- **Version Alignment**: Bumped npm/Rust wrapper versions to `2.0.2` for a clean global upgrade path.
+
 ## [2.0.1] - 2026-02-06
 
 ### 🛠 Installation Reliability
