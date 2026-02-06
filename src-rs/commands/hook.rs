@@ -7,9 +7,10 @@ pub async fn run(action: String, global: bool) -> Result<()> {
         "install" => run_install(global).await,
         "remove" => run_remove(global).await,
         "status" => run_status(global).await,
-        _ => Err(crate::error::GitAiError::InvalidArgument(
-            format!("Unknown hook action: {}", action),
-        )),
+        _ => Err(crate::error::GitAiError::InvalidArgument(format!(
+            "Unknown hook action: {}",
+            action
+        ))),
     }
 }
 
@@ -22,8 +23,9 @@ async fn run_install(global: bool) -> Result<()> {
 
     // Create hook directory if needed
     if let Some(parent) = hook_path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| crate::error::GitAiError::Other(format!("Failed to create hook directory: {}", e)))?;
+        fs::create_dir_all(parent).map_err(|e| {
+            crate::error::GitAiError::Other(format!("Failed to create hook directory: {}", e))
+        })?;
     }
 
     // Generate hook script (platform-specific)
@@ -35,8 +37,9 @@ async fn run_install(global: bool) -> Result<()> {
 
     // Check if hook already exists
     if hook_path.exists() {
-        let existing = fs::read_to_string(&hook_path)
-            .map_err(|e| crate::error::GitAiError::Other(format!("Failed to read existing hook: {}", e)))?;
+        let existing = fs::read_to_string(&hook_path).map_err(|e| {
+            crate::error::GitAiError::Other(format!("Failed to read existing hook: {}", e))
+        })?;
 
         if existing.contains("git-ai") {
             println!("✅ Git hook already installed at {}", hook_path.display());
@@ -45,8 +48,9 @@ async fn run_install(global: bool) -> Result<()> {
 
         // Backup existing hook
         let backup_path = format!("{}.original", hook_path.display());
-        fs::copy(&hook_path, &backup_path)
-            .map_err(|e| crate::error::GitAiError::Other(format!("Failed to backup hook: {}", e)))?;
+        fs::copy(&hook_path, &backup_path).map_err(|e| {
+            crate::error::GitAiError::Other(format!("Failed to backup hook: {}", e))
+        })?;
         println!("📦 Backed up existing hook to {}", backup_path);
     }
 
@@ -59,11 +63,15 @@ async fn run_install(global: bool) -> Result<()> {
     {
         use std::os::unix::fs::PermissionsExt;
         let perms = fs::Permissions::from_mode(0o755);
-        fs::set_permissions(&hook_path, perms)
-            .map_err(|e| crate::error::GitAiError::Other(format!("Failed to make hook executable: {}", e)))?;
+        fs::set_permissions(&hook_path, perms).map_err(|e| {
+            crate::error::GitAiError::Other(format!("Failed to make hook executable: {}", e))
+        })?;
     }
 
-    println!("✅ Git hook installed successfully at {}", hook_path.display());
+    println!(
+        "✅ Git hook installed successfully at {}",
+        hook_path.display()
+    );
     println!("   Hook will run before each commit to generate messages");
 
     Ok(())
@@ -84,14 +92,17 @@ async fn run_remove(global: bool) -> Result<()> {
     // Check if there's a backup
     let backup_path = format!("{}.original", hook_path.display());
     if PathBuf::from(&backup_path).exists() {
-        fs::copy(&backup_path, &hook_path)
-            .map_err(|e| crate::error::GitAiError::Other(format!("Failed to restore backup: {}", e)))?;
-        fs::remove_file(&backup_path)
-            .map_err(|e| crate::error::GitAiError::Other(format!("Failed to remove backup: {}", e)))?;
+        fs::copy(&backup_path, &hook_path).map_err(|e| {
+            crate::error::GitAiError::Other(format!("Failed to restore backup: {}", e))
+        })?;
+        fs::remove_file(&backup_path).map_err(|e| {
+            crate::error::GitAiError::Other(format!("Failed to remove backup: {}", e))
+        })?;
         println!("✅ Git hook removed and original hook restored");
     } else {
-        fs::remove_file(&hook_path)
-            .map_err(|e| crate::error::GitAiError::Other(format!("Failed to remove hook: {}", e)))?;
+        fs::remove_file(&hook_path).map_err(|e| {
+            crate::error::GitAiError::Other(format!("Failed to remove hook: {}", e))
+        })?;
         println!("✅ Git hook removed successfully");
     }
 
@@ -136,7 +147,9 @@ fn get_local_hook_path() -> Result<PathBuf> {
     }
 
     let git_dir_str = String::from_utf8_lossy(&git_dir.stdout).trim().to_string();
-    Ok(PathBuf::from(git_dir_str).join("hooks").join("prepare-commit-msg"))
+    Ok(PathBuf::from(git_dir_str)
+        .join("hooks")
+        .join("prepare-commit-msg"))
 }
 
 fn get_global_hook_path() -> Result<PathBuf> {
@@ -156,9 +169,13 @@ fn get_global_hook_path() -> Result<PathBuf> {
     }
 
     // Fallback to ~/.config/git-ai-cli/hooks
-    let config_dir = dirs::config_dir()
-        .ok_or_else(|| crate::error::GitAiError::Config("Cannot determine config directory".to_string()))?;
-    Ok(config_dir.join("git-ai-cli").join("hooks").join("prepare-commit-msg"))
+    let config_dir = dirs::config_dir().ok_or_else(|| {
+        crate::error::GitAiError::Config("Cannot determine config directory".to_string())
+    })?;
+    Ok(config_dir
+        .join("git-ai-cli")
+        .join("hooks")
+        .join("prepare-commit-msg"))
 }
 
 fn generate_hook_script_bash() -> String {
@@ -211,7 +228,8 @@ if [ -n "$MESSAGE" ]; then
 fi
 
 exit 0
-"#.to_string()
+"#
+    .to_string()
 }
 
 fn generate_hook_script_windows() -> String {
@@ -259,5 +277,7 @@ fn generate_hook_script_windows() -> String {
         ")\r\n",
         "\r\n",
         "exit /b 0\r\n",
-    ].concat().to_string()
+    ]
+    .concat()
+    .to_string()
 }
