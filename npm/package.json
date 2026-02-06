@@ -1,0 +1,36 @@
+{
+  "name": "@dongowu/git-ai-cli",
+  "version": "2.0.0",
+  "description": "Generate git commit messages using AI - Rust Edition",
+  "license": "MIT",
+  "author": "dongowu <dongowu@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dongowu/git-ai-cli"
+  },
+  "bin": {
+    "git-ai": "bin/git-ai.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "optionalDependencies": {
+    "@dongowu/git-ai-cli-linux-x64": "2.0.0",
+    "@dongowu/git-ai-cli-linux-arm64": "2.0.0",
+    "@dongowu/git-ai-cli-darwin-x64": "2.0.0",
+    "@dongowu/git-ai-cli-darwin-arm64": "2.0.0",
+    "@dongowu/git-ai-cli-win32-x64": "2.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "keywords": [
+    "git",
+    "commit",
+    "ai",
+    "conventional-commits",
+    "deepseek",
+    "openai",
+    "ollama"
+  ]
+}
