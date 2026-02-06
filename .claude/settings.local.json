@@ -39,7 +39,9 @@
       "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" copilot explain \"What is the purpose of this code analysis?\")",
       "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" copilot -p \"Analyze this code change: Added a new authentication function that validates user tokens\" --allow-tool 'shell\\(echo\\)')",
       "Bash(git rm:*)",
-      "Bash(du:*)"
+      "Bash(du:*)",
+      "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" run list --limit 5)",
+      "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" run view 21750552592 --log)"
     ]
   }
 }
