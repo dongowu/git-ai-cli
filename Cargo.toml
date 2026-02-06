@@ -22,9 +22,6 @@ indicatif = "0.17"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 tokio = { version = "1.40", features = ["full"] }
 
-# Git operations
-git2 = "0.20"
-
 # Configuration
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
