@@ -1,0 +1,3 @@
+# Only include the binary
+*
+!bin/

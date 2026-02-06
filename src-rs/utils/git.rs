@@ -1,5 +1,12 @@
 use crate::error::{GitAiError, Result};
+use std::collections::HashSet;
 use std::process::Command;
+
+#[derive(Debug, Clone)]
+pub struct UnstagedFileEntry {
+    pub label: String,
+    pub paths: Vec<String>,
+}
 
 pub struct GitManager;
 
@@ -60,11 +67,12 @@ impl GitManager {
         Ok(files)
     }
 
-    /// Get list of unstaged files
-    pub fn get_unstaged_files() -> Result<Vec<String>> {
+    /// Get list of unstaged files (including renames and untracked files)
+    pub fn get_unstaged_files() -> Result<Vec<UnstagedFileEntry>> {
         let output = Command::new("git")
-            .arg("diff")
-            .arg("--name-only")
+            .arg("status")
+            .arg("--porcelain")
+            .arg("-z")
             .output()
             .map_err(|e| GitAiError::Git(format!("Failed to get unstaged files: {}", e)))?;
 
@@ -72,12 +80,63 @@ impl GitManager {
             return Err(GitAiError::Git("Failed to get unstaged files".to_string()));
         }
 
-        let files = String::from_utf8_lossy(&output.stdout)
-            .lines()
-            .map(|s| s.to_string())
-            .collect();
+        let raw = String::from_utf8_lossy(&output.stdout);
+        let entries: Vec<&str> = raw.split('\0').filter(|s| !s.is_empty()).collect();
+        let mut results: Vec<UnstagedFileEntry> = Vec::new();
+        let mut seen: HashSet<String> = HashSet::new();
 
-        Ok(files)
+        let mut i = 0usize;
+        while i < entries.len() {
+            let entry = entries[i];
+            if entry.len() < 3 {
+                i += 1;
+                continue;
+            }
+
+            let status = &entry[..2];
+            let path_start = entry.find(' ').map(|idx| idx + 1).unwrap_or(3);
+            let path = entry.get(path_start..).unwrap_or("").to_string();
+
+            let is_rename = status.contains('R') || status.contains('C');
+            let mut new_path: Option<String> = None;
+            if is_rename && i + 1 < entries.len() {
+                new_path = Some(entries[i + 1].to_string());
+                i += 1;
+            }
+
+            let is_untracked = status == "??";
+            let has_worktree_change = status.chars().nth(1).unwrap_or(' ') != ' ';
+
+            if !is_untracked && !has_worktree_change {
+                i += 1;
+                continue;
+            }
+
+            if is_rename {
+                if let Some(new_path) = new_path {
+                    let label = format!("{} -> {}", path, new_path);
+                    if seen.insert(label.clone()) {
+                        results.push(UnstagedFileEntry {
+                            label,
+                            paths: vec![path, new_path],
+                        });
+                    }
+                }
+                i += 1;
+                continue;
+            }
+
+            if !path.is_empty() && seen.insert(path.clone()) {
+                results.push(UnstagedFileEntry {
+                    label: path.clone(),
+                    paths: vec![path],
+                });
+            }
+
+            i += 1;
+        }
+
+        Ok(results)
     }
 
     /// Get current branch name
@@ -145,7 +204,7 @@ impl GitManager {
     /// Stage files
     pub fn add_files(files: &[String]) -> Result<()> {
         let mut cmd = Command::new("git");
-        cmd.arg("add");
+        cmd.arg("add").arg("-A").arg("--");
 
         for file in files {
             cmd.arg(file);
@@ -199,6 +258,7 @@ impl GitManager {
     }
 
     /// Get file diff
+    #[allow(dead_code)]
     pub fn get_file_diff(file: &str) -> Result<String> {
         let output = Command::new("git")
             .arg("diff")
