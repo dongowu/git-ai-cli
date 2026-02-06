@@ -3,14 +3,26 @@ name: Rust Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v2.0.0). Leave empty when triggered from tag push."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   build:
     name: Build ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -38,6 +50,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG_INPUT="${{ inputs.tag }}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          elif [[ -n "${TAG_INPUT}" ]]; then
+            VERSION="${TAG_INPUT#v}"
+          else
+            echo "::error::workflow_dispatch requires inputs.tag when not running on a tag ref."
+            exit 1
+          fi
+
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "Release version: ${VERSION}"
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -47,18 +78,84 @@ jobs:
         if: matrix.platform == 'linux-arm64'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+          sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+
+      - name: Configure linker (Linux ARM64)
+        if: matrix.platform == 'linux-arm64'
+        shell: bash
+        run: |
+          mkdir -p ~/.cargo
+          cat >> ~/.cargo/config.toml <<EOF
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
+          EOF
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Copy binary to platform package
+      - name: Prepare platform package
         shell: bash
         run: |
-          mkdir -p npm-platform/${{ matrix.platform }}/bin
-          cp target/${{ matrix.target }}/release/${{ matrix.binary }} npm-platform/${{ matrix.platform }}/bin/
+          set -euo pipefail
 
-      - name: Upload artifact
+          case "${{ matrix.platform }}" in
+            linux-x64)
+              NPM_OS="linux"
+              NPM_CPU="x64"
+              ;;
+            linux-arm64)
+              NPM_OS="linux"
+              NPM_CPU="arm64"
+              ;;
+            darwin-x64)
+              NPM_OS="darwin"
+              NPM_CPU="x64"
+              ;;
+            darwin-arm64)
+              NPM_OS="darwin"
+              NPM_CPU="arm64"
+              ;;
+            win32-x64)
+              NPM_OS="win32"
+              NPM_CPU="x64"
+              ;;
+            *)
+              echo "Unsupported platform: ${{ matrix.platform }}"
+              exit 1
+              ;;
+          esac
+
+          PACKAGE_DIR="npm-platform/${{ matrix.platform }}"
+          mkdir -p "${PACKAGE_DIR}/bin"
+          cp "target/${{ matrix.target }}/release/${{ matrix.binary }}" "${PACKAGE_DIR}/bin/"
+
+          cat > "${PACKAGE_DIR}/package.json" <<JSON
+          {
+            "name": "@dongowu/git-ai-cli-${{ matrix.platform }}",
+            "version": "${{ steps.version.outputs.version }}",
+            "description": "Platform binary for @dongowu/git-ai-cli (${{ matrix.platform }})",
+            "license": "Apache-2.0",
+            "repository": {
+              "type": "git",
+              "url": "https://github.com/dongowu/git-ai-cli"
+            },
+            "os": ["${NPM_OS}"],
+            "cpu": ["${NPM_CPU}"],
+            "files": ["bin/${{ matrix.binary }}"],
+            "publishConfig": {
+              "access": "public"
+            }
+          }
+          JSON
+
+          cat > "${PACKAGE_DIR}/README.md" <<EOF
+          # @dongowu/git-ai-cli-${{ matrix.platform }}
+
+          Platform-specific binary package for \
+          [@dongowu/git-ai-cli](https://www.npmjs.com/package/@dongowu/git-ai-cli).
+          EOF
+
+      - name: Upload platform package artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}
@@ -68,52 +165,113 @@ jobs:
     name: Publish to npm
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+      id-token: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG_INPUT="${{ inputs.tag }}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          elif [[ -n "${TAG_INPUT}" ]]; then
+            VERSION="${TAG_INPUT#v}"
+          else
+            echo "::error::workflow_dispatch requires inputs.tag when not running on a tag ref."
+            exit 1
+          fi
+
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "Release version: ${VERSION}"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
 
-      - name: Download all artifacts
+      - name: Download all platform artifacts
         uses: actions/download-artifact@v4
         with:
           path: npm-platform
 
+      - name: Align root package version with tag
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node <<"NODE"
+          const fs = require("fs");
+
+          const version = process.env.RELEASE_VERSION;
+          const pkgPath = "package.json";
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+
+          pkg.version = version;
+          pkg.optionalDependencies = pkg.optionalDependencies || {};
+
+          for (const platform of ["linux-x64", "linux-arm64", "darwin-x64", "darwin-arm64", "win32-x64"]) {
+            pkg.optionalDependencies[`@dongowu/git-ai-cli-${platform}`] = version;
+          }
+
+          fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+          NODE
+
       - name: Publish platform packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
         run: |
-          for platform in linux-x64 linux-arm64 darwin-x64 darwin-arm64 win32-x64; do
-            cd npm-platform/$platform
-            npm publish --access public
-            cd ../..
+          set -euo pipefail
+
+          for package_dir in npm-platform/*; do
+            if [[ ! -d "${package_dir}" || ! -f "${package_dir}/package.json" ]]; then
+              continue
+            fi
+
+            package_name=$(node -e "console.log(require(process.argv[1]).name)" "${package_dir}/package.json")
+            package_version=$(node -e "console.log(require(process.argv[1]).version)" "${package_dir}/package.json")
+
+            if npm view "${package_name}@${package_version}" version >/dev/null 2>&1; then
+              echo "Skipping ${package_name}@${package_version} (already published)."
+              continue
+            fi
+
+            echo "Publishing ${package_name}@${package_version}"
+            npm publish "${package_dir}" --access public --provenance
           done
 
       - name: Publish main package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
         run: |
-          cd npm
-          npm publish --access public
+          set -euo pipefail
+
+          package_name=$(node -e "console.log(require(process.argv[1]).name)" "./package.json")
+          package_version=$(node -e "console.log(require(process.argv[1]).version)" "./package.json")
+
+          if npm view "${package_name}@${package_version}" version >/dev/null 2>&1; then
+            echo "Skipping ${package_name}@${package_version} (already published)."
+            exit 0
+          fi
+
+          echo "Publishing ${package_name}@${package_version}"
+          npm publish --access public --provenance
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.version.outputs.version }}
+          generate_release_notes: true
           files: |
             npm-platform/*/bin/*
-          body: |
-            ## Installation
-            ```bash
-            npm install -g @dongowu/git-ai-cli
-            ```
-
-            ## What's Changed
-            See commit history for details.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
