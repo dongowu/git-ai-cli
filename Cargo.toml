@@ -1,0 +1,46 @@
+[package]
+name = "git-ai-cli"
+version = "2.0.0"
+edition = "2021"
+authors = ["dongowu <dongowu@gmail.com>"]
+description = "A CLI tool to generate git commit messages using AI"
+license = "MIT"
+repository = "https://github.com/dongowu/git-ai-cli"
+
+[[bin]]
+name = "git-ai"
+path = "src-rs/main.rs"
+
+[dependencies]
+# CLI & Terminal
+clap = { version = "4.5", features = ["derive"] }
+dialoguer = "0.11"
+console = "0.15"
+indicatif = "0.17"
+
+# HTTP & AI
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+tokio = { version = "1.40", features = ["full"] }
+
+# Git operations
+git2 = "0.19"
+
+# Configuration
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+dirs = "5.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Utilities
+regex = "1.10"
+chrono = "0.4"
+colored = "2.1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+codegen-units = 1
