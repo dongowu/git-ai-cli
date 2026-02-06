@@ -266,12 +266,25 @@ jobs:
           echo "Publishing ${package_name}@${package_version}"
           npm publish --access public --provenance
 
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p release-assets
+
+          cp "npm-platform/linux-x64/bin/git-ai" "release-assets/git-ai-cli-linux-x64"
+          cp "npm-platform/linux-arm64/bin/git-ai" "release-assets/git-ai-cli-linux-arm64"
+          cp "npm-platform/darwin-x64/bin/git-ai" "release-assets/git-ai-cli-darwin-x64"
+          cp "npm-platform/darwin-arm64/bin/git-ai" "release-assets/git-ai-cli-darwin-arm64"
+          cp "npm-platform/win32-x64/bin/git-ai.exe" "release-assets/git-ai-cli-win32-x64.exe"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
           generate_release_notes: true
           files: |
-            npm-platform/*/bin/*
+            release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
