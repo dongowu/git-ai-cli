@@ -245,7 +245,7 @@ jobs:
             fi
 
             echo "Publishing ${package_name}@${package_version}"
-            npm publish "${package_dir}" --access public --provenance
+            npm publish "./${package_dir}" --access public --provenance
           done
 
       - name: Publish main package
