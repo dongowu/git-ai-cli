@@ -37,6 +37,10 @@ struct Cli {
     #[arg(short, long)]
     agent: bool,
 
+    /// Use GitHub Copilot CLI for enhancement
+    #[arg(long)]
+    copilot: bool,
+
     /// Output as JSON
     #[arg(long)]
     json: bool,
@@ -69,6 +73,9 @@ enum Commands {
 
         #[arg(short, long)]
         agent: bool,
+
+        #[arg(long)]
+        copilot: bool,
     },
 
     /// Generate message only (for hooks/scripts)
@@ -172,8 +179,8 @@ async fn run(cli: Cli) -> Result<()> {
     }
 
     match cli.command {
-        Some(Commands::Commit { yes, num, locale, agent }) => {
-            commands::commit::run(yes, num, locale, agent).await
+        Some(Commands::Commit { yes, num, locale, agent, copilot }) => {
+            commands::commit::run(yes, num, locale, agent, copilot).await
         }
         Some(Commands::Msg { num, json, quiet, locale }) => {
             commands::msg::run(num, json, quiet, locale).await
@@ -212,7 +219,7 @@ async fn run(cli: Cli) -> Result<()> {
         }
         None => {
             // Default: interactive commit
-            commands::commit::run(cli.yes, cli.num, cli.locale, cli.agent).await
+            commands::commit::run(cli.yes, cli.num, cli.locale, cli.agent, cli.copilot).await
         }
     }
 }

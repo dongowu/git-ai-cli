@@ -29,6 +29,18 @@
 
 ---
 
+## 🦀 Rust 版说明（当前默认发布）
+
+从 **2.x** 开始，`git-ai-cli` 默认发布 **Rust 版**（更快、单文件二进制）。推荐通过 npm 安装（会自动下载对应平台的二进制）：
+
+```bash
+npm install -g @dongowu/git-ai-cli
+```
+
+> Rust 版目前包含 **agent-lite**（影响分析/符号搜索），增强安全/性能分析功能仍在迁移中。
+
+> 如需旧版 TypeScript（1.x）请自行固定版本号安装。
+
 ## 🚀 快速开始
 
 ```bash
@@ -36,7 +48,7 @@
 npm install -g @dongowu/git-ai-cli
 
 # 2. 初始化 (自动探测本地模型或配置 API)
-git-ai init
+git-ai config
 
 # 3. 使用
 git add .
@@ -200,7 +212,7 @@ git-ai report --days 30
 
 | 命令 | 别名 | 说明 |
 |------|------|------|
-| `git-ai init` | `config` | **初始化配置**（设置模型、Key、语言） |
+| `git-ai config` | `config` | **初始化配置**（设置模型、Key、语言） |
 | `git-ai config get` | | 查看当前生效配置（支持 `--json` / `--local`） |
 | `git-ai config set <key> <value>` | | 设置配置（支持 `--local` / `--json`） |
 | `git-ai config describe` | | 查看可配置项与环境变量覆盖 |
@@ -220,7 +232,7 @@ git-ai report --days 30
 
 | 类型 | 服务商 | 优势 | 配置方式 |
 |------|--------|------|----------|
-| **本地隐私** | **Ollama** | 免费、离线、绝对隐私 | `git-ai init` 自动探测 |
+| **本地隐私** | **Ollama** | 免费、离线、绝对隐私 | `git-ai config` 自动探测 |
 | | **LM Studio** | 兼容性好 | 手动输入 URL |
 | **国内高速** | **DeepSeek** | **性价比之王**，代码能力极强 | API Key |
 | | **通义千问** | 阿里生态，长文本能力强 | API Key |
