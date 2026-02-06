@@ -6,9 +6,7 @@ pub struct AgentLite;
 
 impl AgentLite {
     /// Analyze file importance based on insertions and deletions
-    pub fn analyze_file_importance(
-        stats: &[(String, u32, u32)],
-    ) -> Vec<(String, u32)> {
+    pub fn analyze_file_importance(stats: &[(String, u32, u32)]) -> Vec<(String, u32)> {
         let mut importance: Vec<(String, u32)> = stats
             .iter()
             .map(|(file, insertions, deletions)| {
@@ -27,8 +25,8 @@ impl AgentLite {
         let mut symbols = Vec::new();
 
         // Match function definitions
-        let func_regex = Regex::new(r"(?:^|\n)\+.*(?:fn|function|def|async fn)\s+(\w+)\s*\(")
-            .unwrap();
+        let func_regex =
+            Regex::new(r"(?:^|\n)\+.*(?:fn|function|def|async fn)\s+(\w+)\s*\(").unwrap();
         for cap in func_regex.captures_iter(diff) {
             if let Some(name) = cap.get(1) {
                 symbols.push(name.as_str().to_string());
@@ -36,8 +34,8 @@ impl AgentLite {
         }
 
         // Match class/struct definitions
-        let class_regex = Regex::new(r"(?:^|\n)\+.*(?:class|struct|interface|type)\s+(\w+)")
-            .unwrap();
+        let class_regex =
+            Regex::new(r"(?:^|\n)\+.*(?:class|struct|interface|type)\s+(\w+)").unwrap();
         for cap in class_regex.captures_iter(diff) {
             if let Some(name) = cap.get(1) {
                 symbols.push(name.as_str().to_string());
@@ -100,10 +98,7 @@ impl AgentLite {
     }
 
     /// Run lightweight agent analysis
-    pub async fn run_analysis(
-        diff: &str,
-        branch_name: Option<&str>,
-    ) -> Result<String> {
+    pub async fn run_analysis(diff: &str, branch_name: Option<&str>) -> Result<String> {
         // Get file statistics
         let stats = GitManager::get_file_stats()?;
         let important_files = Self::analyze_file_importance(&stats);

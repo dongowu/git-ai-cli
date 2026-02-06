@@ -80,10 +80,7 @@ impl CopilotCLI {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(GitAiError::Other(format!(
-                "Copilot CLI failed: {}",
-                stderr
-            )));
+            return Err(GitAiError::Other(format!("Copilot CLI failed: {}", stderr)));
         }
 
         let result = String::from_utf8(output.stdout)
@@ -106,7 +103,11 @@ impl CopilotCLI {
 
             if line.starts_with("IMPACT:") {
                 current_section = "impact";
-                impact_summary = line.strip_prefix("IMPACT:").unwrap_or("").trim().to_string();
+                impact_summary = line
+                    .strip_prefix("IMPACT:")
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
             } else if line.starts_with("RISKS:") {
                 current_section = "risks";
             } else if line.starts_with("AFFECTED:") {
@@ -114,7 +115,11 @@ impl CopilotCLI {
             } else if line.starts_with("TESTS:") {
                 current_section = "tests";
             } else if line.starts_with("- ") || line.starts_with("* ") {
-                let item = line.trim_start_matches("- ").trim_start_matches("* ").trim().to_string();
+                let item = line
+                    .trim_start_matches("- ")
+                    .trim_start_matches("* ")
+                    .trim()
+                    .to_string();
                 if !item.is_empty() {
                     match current_section {
                         "risks" => potential_issues.push(item),

@@ -1,7 +1,7 @@
 use crate::error::Result;
-use crate::utils::{ConfigManager, GitManager};
-use crate::utils::ai::{AIClient, PromptTemplates};
 use crate::types::CommitMessageOutput;
+use crate::utils::ai::{AIClient, PromptTemplates};
+use crate::utils::{ConfigManager, GitManager};
 
 pub async fn run(
     num: usize,
@@ -65,9 +65,11 @@ pub async fn run(
             .generate_multiple_messages(&system_prompt, &user_prompt, num)
             .await?
     } else {
-        vec![ai_client
-            .generate_commit_message(&system_prompt, &user_prompt)
-            .await?]
+        vec![
+            ai_client
+                .generate_commit_message(&system_prompt, &user_prompt)
+                .await?,
+        ]
     };
 
     // Output results

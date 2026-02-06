@@ -1,7 +1,7 @@
 use crate::error::Result;
-use crate::utils::{ConfigManager, GitManager, CopilotCLI};
 use crate::utils::agent_lite::AgentLite;
 use crate::utils::ai::{AIClient, PromptTemplates};
+use crate::utils::{ConfigManager, CopilotCLI, GitManager};
 use dialoguer::{MultiSelect, Select};
 use indicatif::ProgressBar;
 use std::collections::HashSet;
@@ -132,9 +132,11 @@ pub async fn run(
             .generate_multiple_messages(&system_prompt, &user_prompt, num)
             .await?
     } else {
-        vec![ai_client
-            .generate_commit_message(&system_prompt, &user_prompt)
-            .await?]
+        vec![
+            ai_client
+                .generate_commit_message(&system_prompt, &user_prompt)
+                .await?,
+        ]
     };
 
     pb.finish_and_clear();
@@ -253,9 +255,11 @@ pub async fn run(
                         .generate_multiple_messages(&system_prompt, &user_prompt, num)
                         .await?
                 } else {
-                    vec![ai_client
-                        .generate_commit_message(&system_prompt, &user_prompt)
-                        .await?]
+                    vec![
+                        ai_client
+                            .generate_commit_message(&system_prompt, &user_prompt)
+                            .await?,
+                    ]
                 };
 
                 pb.finish_and_clear();
@@ -279,10 +283,12 @@ fn edit_message(original: &str) -> Result<String> {
     let temp_file = temp_dir.join("git-ai-commit-msg.txt");
 
     // Write original message to temp file
-    let mut file = std::fs::File::create(&temp_file)
-        .map_err(|e| crate::error::GitAiError::Other(format!("Failed to create temp file: {}", e)))?;
-    file.write_all(original.as_bytes())
-        .map_err(|e| crate::error::GitAiError::Other(format!("Failed to write temp file: {}", e)))?;
+    let mut file = std::fs::File::create(&temp_file).map_err(|e| {
+        crate::error::GitAiError::Other(format!("Failed to create temp file: {}", e))
+    })?;
+    file.write_all(original.as_bytes()).map_err(|e| {
+        crate::error::GitAiError::Other(format!("Failed to write temp file: {}", e))
+    })?;
     drop(file);
 
     // Get editor from environment or use default
@@ -303,12 +309,15 @@ fn edit_message(original: &str) -> Result<String> {
         .map_err(|e| crate::error::GitAiError::Other(format!("Failed to open editor: {}", e)))?;
 
     if !status.success() {
-        return Err(crate::error::GitAiError::Other("Editor exited with error".to_string()));
+        return Err(crate::error::GitAiError::Other(
+            "Editor exited with error".to_string(),
+        ));
     }
 
     // Read edited message
-    let edited = std::fs::read_to_string(&temp_file)
-        .map_err(|e| crate::error::GitAiError::Other(format!("Failed to read edited file: {}", e)))?;
+    let edited = std::fs::read_to_string(&temp_file).map_err(|e| {
+        crate::error::GitAiError::Other(format!("Failed to read edited file: {}", e))
+    })?;
 
     // Clean up temp file
     let _ = std::fs::remove_file(&temp_file);
