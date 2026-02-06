@@ -244,6 +244,12 @@ git-ai report
 
 # Generate report for the last 30 days
 git-ai report --days 30
+
+# Generate feature-focused release notes from latest tag to current ref
+git-ai report --from-last-tag
+
+# Generate release notes for a specific tag range (e.g. v1.0.21 -> v2.0.0)
+git-ai report --from-tag v1.0.21 --to-ref v2.0.0
 ```
 
 ---
@@ -264,7 +270,7 @@ git-ai report --days 30
 | `git-ai -n 3` | | Generate 3 options to choose from |
 | `git-ai -l en` | | Force language (en/zh) |
 | `git-ai hook install` | | **Install Git Hook** (supports `--global`) |
-| `git-ai report` | | **Generate AI Report** (supports `--days`) |
+| `git-ai report` | | **Generate AI Report / Release Notes** (supports `--days` / `--from-last-tag` / `--from-tag --to-ref`) |
 | `git-ai msg` | | Generate message only (stdout for scripts) |
 
 ---

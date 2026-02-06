@@ -1,16 +1,52 @@
-use crate::error::Result;
+use crate::error::{GitAiError, Result};
 use crate::utils::ai::AIClient;
 use crate::utils::ConfigManager;
 use crate::utils::GitManager;
 
-pub async fn run(days: usize) -> Result<()> {
-    println!("📊 Generating report for the last {} days...\n", days);
+pub async fn run(
+    days: usize,
+    from_last_tag: bool,
+    from_tag: Option<String>,
+    to_ref: Option<String>,
+) -> Result<()> {
+    if from_last_tag && from_tag.is_some() {
+        return Err(GitAiError::InvalidArgument(
+            "--from-last-tag cannot be used together with --from-tag".to_string(),
+        ));
+    }
 
-    // Get commits from the specified period
-    let commits = GitManager::get_commits_by_days(days)?;
+    if to_ref.is_some() && !from_last_tag && from_tag.is_none() {
+        return Err(GitAiError::InvalidArgument(
+            "--to-ref requires --from-last-tag or --from-tag".to_string(),
+        ));
+    }
+
+    let target_ref = to_ref.unwrap_or_else(|| "HEAD".to_string());
+
+    let (commits, scope, range_mode) = if from_last_tag {
+        let latest_tag = GitManager::get_latest_tag()?.ok_or_else(|| {
+            GitAiError::InvalidArgument(
+                "No git tag found. Use --from-tag <tag> or fall back to --days.".to_string(),
+            )
+        })?;
+        let commits = GitManager::get_commits_between_refs(&latest_tag, &target_ref)?;
+        (commits, format!("{}..{}", latest_tag, target_ref), true)
+    } else if let Some(from_tag) = from_tag {
+        let commits = GitManager::get_commits_between_refs(&from_tag, &target_ref)?;
+        (commits, format!("{}..{}", from_tag, target_ref), true)
+    } else {
+        let commits = GitManager::get_commits_by_days(days)?;
+        (commits, format!("last {} days", days), false)
+    };
+
+    if range_mode {
+        println!("📦 Generating release notes for {}...\n", scope);
+    } else {
+        println!("📊 Generating report for {}...\n", scope);
+    }
 
     if commits.is_empty() {
-        println!("No commits found in the last {} days", days);
+        println!("No commits found in {}", scope);
         return Ok(());
     }
 
@@ -23,11 +59,23 @@ pub async fn run(days: usize) -> Result<()> {
     let ai_client = AIClient::new(config.clone())?;
 
     // Generate report using AI
-    let system_prompt = get_report_system_prompt(&config.locale);
-    let user_prompt = format!(
-        "Generate a structured report for the following commits:\n\n{}",
-        commits.join("\n")
-    );
+    let system_prompt = if range_mode {
+        get_release_notes_system_prompt(&config.locale)
+    } else {
+        get_report_system_prompt(&config.locale)
+    };
+    let user_prompt = if range_mode {
+        format!(
+            "Current service: git-ai-cli (Rust 2.x).\nCommit range: {}\n\nPlease generate release notes focused on functional changes and service impact:\n\n{}",
+            scope,
+            commits.join("\n")
+        )
+    } else {
+        format!(
+            "Generate a structured report for the following commits:\n\n{}",
+            commits.join("\n")
+        )
+    };
 
     println!("🤖 Analyzing commits...\n");
 
@@ -38,6 +86,63 @@ pub async fn run(days: usize) -> Result<()> {
     println!("{}", report);
 
     Ok(())
+}
+
+fn get_release_notes_system_prompt(locale: &str) -> String {
+    match locale {
+        "zh" => {
+            r#"你是一个专业的软件版本发布说明生成器。请根据提交记录输出清晰、可直接发布的功能描述。
+
+请按以下结构输出：
+
+## 📦 版本概览
+- 变更范围：<from..to>
+- 总提交数：X
+- 发布定位：一句话说明本次版本目标
+
+## ✨ 功能更新
+- 按业务价值总结功能能力，不要逐条抄提交信息
+
+## 🛠 稳定性与工程改进
+- 包括修复、CI/CD、性能、构建链路优化
+
+## ⚠️ 升级影响（当前服务）
+- 说明可能影响使用方的行为变化
+- 给出迁移/回滚建议（如有）
+
+写作要求：
+1) 以“对当前服务可感知的能力变化”为核心。
+2) 避免泛泛而谈，保持专业、简洁、可读。
+3) 不要编造未在提交中出现的事实。"#
+                .to_string()
+        }
+        _ => {
+            r#"You are a professional release-notes generator. Based on the commit list, produce concise and publish-ready release notes.
+
+Use this structure:
+
+## 📦 Release Overview
+- Range: <from..to>
+- Total commits: X
+- Release intent: one sentence about the goal of this release
+
+## ✨ Functional Updates
+- Summarize user-facing capabilities, not raw commit-by-commit rewrites
+
+## 🛠 Stability and Engineering
+- Include fixes, CI/CD updates, performance and build-chain improvements
+
+## ⚠️ Upgrade Impact (Current Service)
+- Describe behavior changes that may affect users
+- Provide migration/rollback hints when relevant
+
+Requirements:
+1) Focus on service-level impact.
+2) Keep it factual, concise, and easy to scan.
+3) Do not invent facts beyond the commit list."#
+                .to_string()
+        }
+    }
 }
 
 fn get_report_system_prompt(locale: &str) -> String {

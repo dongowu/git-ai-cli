@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2026-02-06
+
+### 🦀 Rust Rewrite Upgrade (v1.0.21 -> v2.0.0)
+
+- **Core Runtime Migration**: Rebuilt the CLI from TypeScript/Node.js to Rust for faster startup and lower runtime overhead.
+- **Distribution Upgrade**: Introduced a lightweight npm wrapper with platform-specific binaries (Linux/macOS/Windows).
+- **Feature Parity**: Preserved existing commit/config/hook/report workflows while modernizing internals.
+
+### ✨ Current Service Capability Enhancements
+
+- **Copilot Guardian Mode**: Added optional deep impact analysis and risk hints via GitHub Copilot CLI.
+- **Agent-lite Improvements**: Kept smart diff and impact-oriented commit generation in the Rust release path.
+- **Rust CI Alignment**: Updated CI pipeline for Rust toolchain checks (format/lint/test flows).
+
+### 📦 Release Notes Scope
+
+- This release baseline starts from `v2.0.0` (Rust edition default).
+- To generate functional descriptions between tags locally, use:
+  - `git-ai report --from-last-tag`
+  - `git-ai report --from-tag <prev_tag> --to-ref <local_tag_or_ref>`
+
 ## [1.1.0] - 2026-01-16
 
 ### 🚀 Agent & Intelligence (Major Update)

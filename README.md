@@ -247,6 +247,12 @@ git-ai report
 
 # 生成最近 30 天的汇报
 git-ai report --days 30
+
+# 从“上次 tag”到当前代码生成版本功能描述
+git-ai report --from-last-tag
+
+# 指定 tag 范围生成发布说明（例如 v1.0.21 -> v2.0.0）
+git-ai report --from-tag v1.0.21 --to-ref v2.0.0
 ```
 
 ---
@@ -268,7 +274,7 @@ git-ai report --days 30
 | `git-ai -l en` | | 强制输出语言（en/zh） |
 | `git-ai hook install` | | **安装 Git Hook** (支持 `--global`) |
 | `git-ai hook remove` | | 移除 Git Hook |
-| `git-ai report` | | **生成 AI 周报** (支持 `--days`) |
+| `git-ai report` | | **生成 AI 周报 / 版本说明** (支持 `--days` / `--from-last-tag` / `--from-tag --to-ref`) |
 | `git-ai msg` | | 仅输出消息（供脚本调用） |
 
 ---

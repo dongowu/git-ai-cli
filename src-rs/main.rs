@@ -115,8 +115,21 @@ enum Commands {
 
     /// Generate reports from git history
     Report {
+        /// Generate report by recent days (default mode)
         #[arg(long, default_value = "7")]
         days: usize,
+
+        /// Generate release notes from latest tag to target ref
+        #[arg(long)]
+        from_last_tag: bool,
+
+        /// Generate release notes from specific start tag/ref
+        #[arg(long)]
+        from_tag: Option<String>,
+
+        /// End ref/tag for range mode (default: HEAD)
+        #[arg(long)]
+        to_ref: Option<String>,
     },
 }
 
@@ -214,7 +227,12 @@ async fn run(cli: Cli) -> Result<()> {
             HookSubcommand::Remove => commands::hook::run("remove".to_string(), global).await,
             HookSubcommand::Status => commands::hook::run("status".to_string(), global).await,
         },
-        Some(Commands::Report { days }) => commands::report::run(days).await,
+        Some(Commands::Report {
+            days,
+            from_last_tag,
+            from_tag,
+            to_ref,
+        }) => commands::report::run(days, from_last_tag, from_tag, to_ref).await,
         None => {
             // Default: interactive commit
             commands::commit::run(cli.yes, cli.num, cli.locale, cli.agent, cli.copilot).await

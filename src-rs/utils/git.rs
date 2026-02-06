@@ -199,6 +199,62 @@ impl GitManager {
         Ok(commits)
     }
 
+    /// Get latest reachable tag from HEAD
+    pub fn get_latest_tag() -> Result<Option<String>> {
+        let output = Command::new("git")
+            .arg("describe")
+            .arg("--tags")
+            .arg("--abbrev=0")
+            .output()
+            .map_err(|e| GitAiError::Git(format!("Failed to get latest tag: {}", e)))?;
+
+        if output.status.success() {
+            let tag = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if tag.is_empty() {
+                return Ok(None);
+            }
+            return Ok(Some(tag));
+        }
+
+        // No tags in repository is a normal case for some projects.
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("No names found") || stderr.contains("cannot describe") {
+            return Ok(None);
+        }
+
+        Err(GitAiError::Git(format!(
+            "Failed to get latest tag: {}",
+            stderr.trim()
+        )))
+    }
+
+    /// Get commits between two refs
+    pub fn get_commits_between_refs(from_ref: &str, to_ref: &str) -> Result<Vec<String>> {
+        let range = format!("{}..{}", from_ref, to_ref);
+        let output = Command::new("git")
+            .arg("log")
+            .arg(range)
+            .arg("--format=%h %cd %s")
+            .arg("--date=short")
+            .output()
+            .map_err(|e| GitAiError::Git(format!("Failed to get commits by range: {}", e)))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(GitAiError::Git(format!(
+                "Failed to get commits by range: {}",
+                stderr.trim()
+            )));
+        }
+
+        let commits = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(|s| s.to_string())
+            .collect();
+
+        Ok(commits)
+    }
+
     /// Stage files
     pub fn add_files(files: &[String]) -> Result<()> {
         let mut cmd = Command::new("git");
