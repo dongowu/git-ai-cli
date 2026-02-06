@@ -62,15 +62,14 @@ impl AIClient {
     /// Create a new AI client
     pub fn new(config: AIConfig) -> Result<Self> {
         if config.provider.is_empty() {
-            return Err(GitAiError::Config(
-                "Provider not configured".to_string(),
-            ));
+            return Err(GitAiError::Config("Provider not configured".to_string()));
         }
 
-        if config.api_key.is_empty() && config.provider != "ollama" && config.provider != "lm-studio" {
-            return Err(GitAiError::Config(
-                "API key not configured".to_string(),
-            ));
+        if config.api_key.is_empty()
+            && config.provider != "ollama"
+            && config.provider != "lm-studio"
+        {
+            return Err(GitAiError::Config("API key not configured".to_string()));
         }
 
         let client = Client::builder()
@@ -108,7 +107,7 @@ impl AIClient {
 
         let response = self
             .client
-            .post(&format!("{}/chat/completions", self.config.base_url))
+            .post(format!("{}/chat/completions", self.config.base_url))
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .json(&request)
             .send()
@@ -171,7 +170,7 @@ impl AIClient {
 
         let response = self
             .client
-            .post(&format!("{}/chat/completions", self.config.base_url))
+            .post(format!("{}/chat/completions", self.config.base_url))
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .json(&request)
             .send()
@@ -325,7 +324,10 @@ Rules:
         branch_name: Option<&str>,
         recent_commits: Option<&[String]>,
     ) -> String {
-        let mut prompt = format!("Generate a commit message for the following changes:\n\n```diff\n{}\n```", diff);
+        let mut prompt = format!(
+            "Generate a commit message for the following changes:\n\n```diff\n{}\n```",
+            diff
+        );
 
         if let Some(branch) = branch_name {
             prompt.push_str(&format!("\n\nBranch: {}", branch));

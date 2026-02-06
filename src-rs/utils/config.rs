@@ -9,9 +9,8 @@ pub struct ConfigManager;
 impl ConfigManager {
     /// Get the global config directory
     pub fn get_global_config_dir() -> Result<PathBuf> {
-        let config_dir = config_dir().ok_or_else(|| {
-            GitAiError::Config("Cannot determine config directory".to_string())
-        })?;
+        let config_dir = config_dir()
+            .ok_or_else(|| GitAiError::Config("Cannot determine config directory".to_string()))?;
         Ok(config_dir.join("git-ai-cli"))
     }
 

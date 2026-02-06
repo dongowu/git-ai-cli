@@ -152,9 +152,7 @@ impl GitManager {
             return Err(GitAiError::Git("Failed to get branch name".to_string()));
         }
 
-        Ok(String::from_utf8_lossy(&output.stdout)
-            .trim()
-            .to_string())
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
 
     /// Get recent commits
@@ -232,7 +230,10 @@ impl GitManager {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(GitAiError::Git(format!("Failed to create commit: {}", stderr)));
+            return Err(GitAiError::Git(format!(
+                "Failed to create commit: {}",
+                stderr
+            )));
         }
 
         Ok(())

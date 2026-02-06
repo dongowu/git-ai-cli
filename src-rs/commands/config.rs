@@ -1,12 +1,9 @@
 use crate::error::Result;
+use crate::types::{get_provider_presets, AIConfig};
 use crate::utils::ConfigManager;
-use crate::types::{AIConfig, get_provider_presets};
-use dialoguer::{Select, Input, Confirm};
+use dialoguer::{Confirm, Input, Select};
 
-pub async fn run(
-    subcommand: Option<String>,
-    local: bool,
-) -> Result<()> {
+pub async fn run(subcommand: Option<String>, local: bool) -> Result<()> {
     match subcommand.as_deref() {
         Some("get") => run_get(local).await,
         Some("set") => {
@@ -17,9 +14,10 @@ pub async fn run(
         }
         Some("describe") => run_describe().await,
         None => run_wizard(local).await,
-        Some(cmd) => Err(crate::error::GitAiError::InvalidArgument(
-            format!("Unknown config subcommand: {}", cmd),
-        )),
+        Some(cmd) => Err(crate::error::GitAiError::InvalidArgument(format!(
+            "Unknown config subcommand: {}",
+            cmd
+        ))),
     }
 }
 
@@ -108,7 +106,10 @@ async fn run_wizard(local: bool) -> Result<()> {
 
     // Get model
     let model: String = Input::new()
-        .with_prompt(&format!("Enter model name (default: {})", preset.default_model))
+        .with_prompt(format!(
+            "Enter model name (default: {})",
+            preset.default_model
+        ))
         .default(preset.default_model.clone())
         .interact()
         .map_err(|e| crate::error::GitAiError::Other(format!("Input failed: {}", e)))?;

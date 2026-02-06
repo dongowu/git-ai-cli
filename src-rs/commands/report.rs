@@ -1,7 +1,7 @@
 use crate::error::Result;
-use crate::utils::GitManager;
 use crate::utils::ai::AIClient;
 use crate::utils::ConfigManager;
+use crate::utils::GitManager;
 
 pub async fn run(days: usize) -> Result<()> {
     println!("📊 Generating report for the last {} days...\n", days);
