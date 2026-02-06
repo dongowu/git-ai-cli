@@ -236,8 +236,8 @@ jobs:
               continue
             fi
 
-            package_name=$(node -e "console.log(require(process.argv[1]).name)" "${package_dir}/package.json")
-            package_version=$(node -e "console.log(require(process.argv[1]).version)" "${package_dir}/package.json")
+            package_name=$(node -e "console.log(require(process.argv[1]).name)" "./${package_dir}/package.json")
+            package_version=$(node -e "console.log(require(process.argv[1]).version)" "./${package_dir}/package.json")
 
             if npm view "${package_name}@${package_version}" version >/dev/null 2>&1; then
               echo "Skipping ${package_name}@${package_version} (already published)."
