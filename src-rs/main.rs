@@ -7,7 +7,6 @@ mod types;
 mod utils;
 
 use error::Result;
-use utils::ConfigManager;
 
 #[derive(Parser)]
 #[command(name = "git-ai")]
@@ -197,7 +196,7 @@ async fn run(cli: Cli) -> Result<()> {
             local,
             global: _,
         }) => match subcommand {
-            Some(ConfigSubcommand::Get { json, local }) => {
+            Some(ConfigSubcommand::Get { json: _, local }) => {
                 commands::config::run(Some("get".to_string()), local).await
             }
             Some(ConfigSubcommand::Set {

@@ -143,15 +143,6 @@ impl CopilotCLI {
             test_recommendations,
         })
     }
-
-    /// Get a simple status message about Copilot availability
-    pub fn get_status_message() -> String {
-        if Self::is_available() {
-            "GitHub Copilot CLI available for code analysis".to_string()
-        } else {
-            "GitHub Copilot CLI not available (install: gh auth login)".to_string()
-        }
-    }
 }
 
 #[cfg(test)]

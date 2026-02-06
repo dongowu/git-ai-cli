@@ -106,7 +106,7 @@ async fn run_wizard(local: bool) -> Result<()> {
 
     // Get model
     let model: String = Input::new()
-        .with_prompt(&format!(
+        .with_prompt(format!(
             "Enter model name (default: {})",
             preset.default_model
         ))
