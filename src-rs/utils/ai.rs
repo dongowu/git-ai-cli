@@ -107,7 +107,7 @@ impl AIClient {
 
         let response = self
             .client
-            .post(&format!("{}/chat/completions", self.config.base_url))
+            .post(format!("{}/chat/completions", self.config.base_url))
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .json(&request)
             .send()
@@ -170,7 +170,7 @@ impl AIClient {
 
         let response = self
             .client
-            .post(&format!("{}/chat/completions", self.config.base_url))
+            .post(format!("{}/chat/completions", self.config.base_url))
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .json(&request)
             .send()

@@ -52,7 +52,7 @@ impl AgentLite {
     /// Search for symbol usage in codebase
     pub async fn search_symbol_usage(symbol: &str) -> Result<Vec<String>> {
         let results = GitManager::search_code(symbol)?;
-        Ok(results.iter().take(80).map(|s| s.clone()).collect())
+        Ok(results.iter().take(80).cloned().collect())
     }
 
     /// Extract scope from branch name

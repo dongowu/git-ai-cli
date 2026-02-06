@@ -41,7 +41,9 @@
       "Bash(git rm:*)",
       "Bash(du:*)",
       "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" run list --limit 5)",
-      "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" run view 21750552592 --log)"
+      "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" run view 21750552592 --log)",
+      "Bash(git fetch:*)",
+      "Bash(cargo clippy:*)"
     ]
   }
 }
