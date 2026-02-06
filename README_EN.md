@@ -4,7 +4,7 @@
     <strong>🤖 AI-Powered Git Assistant: Commit, Context & Report</strong>
   </p>
   <p align="center">
-    🚀 <strong>DeepSeek</strong> Optimized | 🏠 <strong>Ollama</strong> Privacy First | 🧠 <strong>Context Aware</strong> | 📊 <strong>AI Reports</strong>
+    🚀 <strong>DeepSeek</strong> Optimized | 🏠 <strong>Ollama</strong> Privacy First | 🧠 <strong>Context Aware</strong> | 🛡️ <strong>Copilot Guardian</strong> | 📊 <strong>AI Reports</strong>
   </p>
 </p>
 
@@ -67,21 +67,29 @@ git-ai
 - **Style Learning**: Automatically analyzes your recent 10 commits to mimic your personal tone, format (e.g., emojis), and language style.
 - **Branch Awareness**: Reads your current branch name (e.g., `feat/user-login`, `fix/JIRA-123`) to generate semantic commits with Issue IDs or scopes.
 
-### 3. 🤖 Agent Intelligence (New)
+### 3. 🤖 Agent Intelligence
 Evolving from a text generator to a code expert.
 - **Smart Diff**: The Agent analyzes file stats and reads only the critical diffs to reduce truncation and token usage on large refactors.
 - **Impact Analysis**: Changing a core API? The Agent proactively searches your codebase (`git grep`) to find usages and warns you about potential breaking changes in the commit body.
 - **Git Flow Guard**: Automatically enables deep analysis on `release/*` or `hotfix/*` branches to protect production code.
 
-### 4. ⚙️ Engineering Ready
+### 4. 🛡️ GitHub Copilot CLI Guardian (New)
+Dual-layer AI architecture: Professional commit generation + Deep code analysis.
+- **Code Impact Analysis**: Uses GitHub Copilot CLI to deeply analyze the scope and potential risks of code changes
+- **Risk Detection**: Automatically identifies breaking changes, potential bugs, and security vulnerabilities
+- **Test Recommendations**: Intelligently suggests test scenarios and use cases
+- **Affected Areas**: Analyzes which modules and files might be impacted
+- **Optional Enable**: Enable on-demand via `--copilot` flag, no forced dependency
+
+### 5. ⚙️ Engineering Ready
 - **Project Config**: Create a `.git-ai.json` in your project root to share settings (model, prompts) with your team.
 - **Smart Ignore**: Use `.git-aiignore` to exclude auto-generated files (like `package-lock.json`) or large files to save tokens and improve accuracy.
 
-### 4. 🪝 Seamless Integration (Git Hook)
+### 6. 🪝 Seamless Integration (Git Hook)
 - **Zero Distraction**: After installing the hook, just run `git commit` (without `-m`). AI automatically fills in the message and opens your editor.
 - **Compatibility**: Perfectly compatible with existing Git workflows. Supports `git commit --no-verify`.
 
-### 5. 📊 AI Reports
+### 7. 📊 AI Reports
 - **One-Click Generation**: `git-ai report` analyzes your recent commits.
 - **Value Driven**: Transforms fragmented commits into structured reports highlighting "Core Outputs", "Bug Fixes", and "Technical Improvements".
 
@@ -173,7 +181,42 @@ git add .
 git-ai
 ```
 
-### Scenario 2: Git Hook (Recommended) 🌟
+### Scenario 2: Copilot Guardian Mode 🌟 Recommended
+
+```bash
+git add .
+git-ai --copilot
+# 1. Generate professional commit message with DeepSeek/Ollama
+# 2. GitHub Copilot CLI deep code impact analysis
+# 3. Display risk warnings and test recommendations
+# 4. Confirm and commit
+```
+
+**Output Example:**
+```
+✨ Generated commit message(s):
+
+feat(auth): implement JWT token refresh mechanism
+
+📊 Impact Analysis:
+   Modified authentication flow to support automatic token refresh
+
+⚠️  Potential Risks:
+   • Breaking change: Old tokens will be invalidated
+   • Session management logic needs update
+
+🔗 Affected Areas:
+   • Login component
+   • API middleware
+   • User session store
+
+✅ Test Recommendations:
+   • Test token expiration handling
+   • Verify refresh token rotation
+   • Check concurrent request handling
+```
+
+### Scenario 3: Git Hook (Recommended) 🌟
 The smoothest experience. Install once, use forever.
 
 ```bash
@@ -192,7 +235,7 @@ git add .
 git commit  # ✨ AI generates "feat(login): implement awesome login logic"
 ```
 
-### Scenario 3: Generate Reports
+### Scenario 4: Generate Reports
 Hate writing weekly reports?
 
 ```bash
@@ -214,7 +257,9 @@ git-ai report --days 30
 | `git-ai config set <key> <value>` | | Set config (supports `--local` / `--json`) |
 | `git-ai config describe` | | List config keys and env overrides |
 | `git-ai` | | Interactive generation & commit |
+| `git-ai --copilot` | | **Copilot Guardian Mode** (Code impact analysis & Risk detection) |
 | `git-ai -a` | | **Agent Mode** (Deep analysis & Impact check) |
+| `git-ai -a --copilot` | | **Ultimate Mode** (Agent + Copilot dual protection) |
 | `git-ai -y` | | Skip confirmation and commit directly |
 | `git-ai -n 3` | | Generate 3 options to choose from |
 | `git-ai -l en` | | Force language (en/zh) |
