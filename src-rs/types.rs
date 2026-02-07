@@ -3,17 +3,21 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AIConfig {
-    pub provider: String,
-    pub api_key: String,
-    pub base_url: String,
-    pub model: String,
     #[serde(default)]
+    pub provider: String,
+    #[serde(default, alias = "apiKey")]
+    pub api_key: String,
+    #[serde(default, alias = "baseUrl")]
+    pub base_url: String,
+    #[serde(default)]
+    pub model: String,
+    #[serde(default, alias = "agentModel")]
     pub agent_model: Option<String>,
     #[serde(default)]
     pub locale: String,
-    #[serde(default)]
+    #[serde(default, alias = "customPrompt")]
     pub custom_prompt: Option<String>,
-    #[serde(default)]
+    #[serde(default, alias = "enableFooter")]
     pub enable_footer: Option<bool>,
 }
 
@@ -136,4 +140,33 @@ pub fn get_provider_presets() -> HashMap<&'static str, ProviderPreset> {
     );
 
     presets
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AIConfig;
+
+    #[test]
+    fn parse_legacy_camel_case_config_fields() {
+        let raw = r#"{
+            "provider": "deepseek",
+            "apiKey": "legacy-key",
+            "baseUrl": "https://api.deepseek.com/v1",
+            "model": "deepseek-chat",
+            "agentModel": "deepseek-chat",
+            "locale": "zh",
+            "customPrompt": "legacy",
+            "enableFooter": true
+        }"#;
+
+        let cfg: AIConfig = serde_json::from_str(raw).expect("legacy config should parse");
+        assert_eq!(cfg.provider, "deepseek");
+        assert_eq!(cfg.api_key, "legacy-key");
+        assert_eq!(cfg.base_url, "https://api.deepseek.com/v1");
+        assert_eq!(cfg.model, "deepseek-chat");
+        assert_eq!(cfg.agent_model.as_deref(), Some("deepseek-chat"));
+        assert_eq!(cfg.locale, "zh");
+        assert_eq!(cfg.custom_prompt.as_deref(), Some("legacy"));
+        assert_eq!(cfg.enable_footer, Some(true));
+    }
 }

@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.3] - 2026-02-07
+
+### 🔄 Config Compatibility Recovery
+
+- **Read legacy v1 global config path**: Rust v2 now falls back to Node.js-era config locations (including macOS `~/Library/Preferences/git-ai-cli-nodejs/config.json`) when the new global path has not been initialized.
+- **Legacy key compatibility**: Config parser now accepts camelCase fields (`apiKey`, `baseUrl`, `agentModel`, `customPrompt`, `enableFooter`) in both global and local config files.
+- **OpenCommit env compatibility restored**: Added `OCO_API_KEY` and `OCO_MODEL` as environment-variable fallbacks so existing setups keep working.
+
 ## [2.0.2] - 2026-02-06
 
 ### 🛠 CLI Launch Reliability

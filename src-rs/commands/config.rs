@@ -57,13 +57,21 @@ async fn run_describe() -> Result<()> {
     println!();
     println!("Environment variables:");
     println!("  GIT_AI_PROVIDER   - Override provider");
+    println!("  OCO_AI_PROVIDER   - OpenCommit-compatible provider override");
     println!("  GIT_AI_API_KEY    - Override API key");
+    println!("  OCO_API_KEY       - OpenCommit-compatible API key override");
+    println!("  OPENAI_API_KEY    - OpenAI key fallback");
+    println!("  DEEPSEEK_API_KEY  - DeepSeek key fallback");
     println!("  GIT_AI_BASE_URL   - Override base URL");
     println!("  GIT_AI_MODEL      - Override model");
+    println!("  OCO_MODEL         - OpenCommit-compatible model override");
     println!("  GIT_AI_LOCALE     - Override locale");
     println!();
     println!("Configuration files:");
-    println!("  Global: ~/.config/git-ai-cli/config.json");
+    let global_path = ConfigManager::get_global_config_path()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|_| "<unavailable>".to_string());
+    println!("  Global: {}", global_path);
     println!("  Local:  .git-ai.json (in project root)");
 
     Ok(())

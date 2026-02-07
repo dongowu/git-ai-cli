@@ -1,6 +1,6 @@
 use crate::error::{GitAiError, Result};
 use crate::types::AIConfig;
-use dirs::config_dir;
+use dirs::{config_dir, home_dir};
 use std::fs;
 use std::path::PathBuf;
 
@@ -28,15 +28,24 @@ impl ConfigManager {
     /// Read global config from file
     pub fn read_global_config() -> Result<AIConfig> {
         let path = Self::get_global_config_path()?;
-        if !path.exists() {
-            return Ok(AIConfig::default());
+        if path.exists() {
+            return Self::read_config_file(&path, "global");
         }
 
-        let content = fs::read_to_string(&path)
-            .map_err(|e| GitAiError::Config(format!("Failed to read global config: {}", e)))?;
-        let config: AIConfig = serde_json::from_str(&content)
-            .map_err(|e| GitAiError::Config(format!("Invalid global config JSON: {}", e)))?;
-        Ok(config)
+        // Backward-compat: v1 Node.js config locations.
+        for legacy_path in Self::get_legacy_global_config_paths() {
+            if !legacy_path.exists() {
+                continue;
+            }
+
+            let config = Self::read_config_file(&legacy_path, "legacy global")?;
+
+            // Best-effort migration to the Rust config path.
+            let _ = Self::write_global_config(&config);
+            return Ok(config);
+        }
+
+        Ok(AIConfig::default())
     }
 
     /// Read local config from file
@@ -46,11 +55,7 @@ impl ConfigManager {
             return Ok(AIConfig::default());
         }
 
-        let content = fs::read_to_string(&path)
-            .map_err(|e| GitAiError::Config(format!("Failed to read local config: {}", e)))?;
-        let config: AIConfig = serde_json::from_str(&content)
-            .map_err(|e| GitAiError::Config(format!("Invalid local config JSON: {}", e)))?;
-        Ok(config)
+        Self::read_config_file(&path, "local")
     }
 
     /// Read config from environment variables
@@ -67,6 +72,8 @@ impl ConfigManager {
         // API Key
         if let Ok(api_key) = std::env::var("GIT_AI_API_KEY") {
             config.api_key = api_key;
+        } else if let Ok(api_key) = std::env::var("OCO_API_KEY") {
+            config.api_key = api_key;
         } else if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
             config.api_key = api_key;
         } else if let Ok(api_key) = std::env::var("DEEPSEEK_API_KEY") {
@@ -80,6 +87,8 @@ impl ConfigManager {
 
         // Model
         if let Ok(model) = std::env::var("GIT_AI_MODEL") {
+            config.model = model;
+        } else if let Ok(model) = std::env::var("OCO_MODEL") {
             config.model = model;
         }
 
@@ -107,6 +116,42 @@ impl ConfigManager {
         }
 
         config
+    }
+
+    fn read_config_file(path: &PathBuf, scope: &str) -> Result<AIConfig> {
+        let content = fs::read_to_string(path).map_err(|e| {
+            GitAiError::Config(format!(
+                "Failed to read {} config ({}): {}",
+                scope,
+                path.display(),
+                e
+            ))
+        })?;
+
+        serde_json::from_str(&content).map_err(|e| {
+            GitAiError::Config(format!(
+                "Invalid {} config JSON ({}): {}",
+                scope,
+                path.display(),
+                e
+            ))
+        })
+    }
+
+    fn get_legacy_global_config_paths() -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+
+        if let Some(home) = home_dir() {
+            paths.push(home.join("Library/Preferences/git-ai-cli-nodejs/config.json"));
+        }
+
+        if let Some(cfg) = config_dir() {
+            paths.push(cfg.join("git-ai-cli-nodejs/config.json"));
+            paths.push(cfg.join("configstore/git-ai-cli-nodejs.json"));
+            paths.push(cfg.join("configstore/git-ai-cli.json"));
+        }
+
+        paths
     }
 
     /// Merge configs with priority: env > local > global
