@@ -441,46 +441,34 @@ mod tests {
     #[test]
     fn test_parse_file_stats_single_file_additions() {
         // Test parsing a single file with only insertions
-        let stats = vec![(
-            "src/main.rs".to_string(),
-            10,
-            0,
-        )];
+        let stats = vec![("src/main.rs".to_string(), 10, 0)];
 
         assert_eq!(stats.len(), 1);
         assert_eq!(stats[0].0, "src/main.rs");
         assert_eq!(stats[0].1, 10); // insertions
-        assert_eq!(stats[0].2, 0);  // deletions
+        assert_eq!(stats[0].2, 0); // deletions
     }
 
     #[test]
     fn test_parse_file_stats_single_file_deletions() {
         // Test parsing a single file with only deletions
-        let stats = vec![(
-            "src/old.rs".to_string(),
-            0,
-            5,
-        )];
+        let stats = vec![("src/old.rs".to_string(), 0, 5)];
 
         assert_eq!(stats.len(), 1);
         assert_eq!(stats[0].0, "src/old.rs");
-        assert_eq!(stats[0].1, 0);  // insertions
-        assert_eq!(stats[0].2, 5);  // deletions
+        assert_eq!(stats[0].1, 0); // insertions
+        assert_eq!(stats[0].2, 5); // deletions
     }
 
     #[test]
     fn test_parse_file_stats_single_file_modifications() {
         // Test parsing a single file with both insertions and deletions
-        let stats = vec![(
-            "src/lib.rs".to_string(),
-            15,
-            8,
-        )];
+        let stats = vec![("src/lib.rs".to_string(), 15, 8)];
 
         assert_eq!(stats.len(), 1);
         assert_eq!(stats[0].0, "src/lib.rs");
         assert_eq!(stats[0].1, 15); // insertions
-        assert_eq!(stats[0].2, 8);  // deletions
+        assert_eq!(stats[0].2, 8); // deletions
     }
 
     #[test]
