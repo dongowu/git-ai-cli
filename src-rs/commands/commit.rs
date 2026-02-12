@@ -57,11 +57,104 @@ pub async fn run(
         }
     }
 
-    // Show staged files
-    println!("\n📝 Staged files:");
+    // Show staged files with line stats as a table
+    let file_stats = GitManager::get_file_stats().unwrap_or_default();
+    let stats_map: std::collections::HashMap<&str, (u32, u32)> = file_stats
+        .iter()
+        .map(|(f, ins, del)| (f.as_str(), (*ins, *del)))
+        .collect();
+
+    let mut total_insertions: u32 = 0;
+    let mut total_deletions: u32 = 0;
+
+    // Calculate column width based on longest filename
+    let file_col_width = staged_files
+        .iter()
+        .map(|f| f.len())
+        .max()
+        .unwrap_or(4)
+        .max(4) // min width = "File".len()
+        + 2; // padding
+
+    let ins_col = 10usize; // "Insertions" header
+    let del_col = 10usize; // "Deletions" header
+
+    println!("\n📝 Staged changes:\n");
+    // Top border
+    println!(
+        "  ┌{:─<file_w$}┬{:─<ins_w$}┬{:─<del_w$}┐",
+        "",
+        "",
+        "",
+        file_w = file_col_width,
+        ins_w = ins_col,
+        del_w = del_col
+    );
+    // Header
+    println!(
+        "  │{:<file_w$}│{:^ins_w$}│{:^del_w$}│",
+        " File",
+        "Inserted",
+        "Deleted",
+        file_w = file_col_width,
+        ins_w = ins_col,
+        del_w = del_col
+    );
+    // Header separator
+    println!(
+        "  ├{:─<file_w$}┼{:─<ins_w$}┼{:─<del_w$}┤",
+        "",
+        "",
+        "",
+        file_w = file_col_width,
+        ins_w = ins_col,
+        del_w = del_col
+    );
+    // File rows
     for file in &staged_files {
-        println!("  • {}", file);
+        let (ins, del) = stats_map.get(file.as_str()).copied().unwrap_or((0, 0));
+        total_insertions += ins;
+        total_deletions += del;
+        println!(
+            "  │ {:<file_w$}│\x1b[32m{:^ins_w$}\x1b[0m│\x1b[31m{:^del_w$}\x1b[0m│",
+            file,
+            format!("+{}", ins),
+            format!("-{}", del),
+            file_w = file_col_width - 1,
+            ins_w = ins_col,
+            del_w = del_col
+        );
     }
+    // Total separator
+    println!(
+        "  ├{:─<file_w$}┼{:─<ins_w$}┼{:─<del_w$}┤",
+        "",
+        "",
+        "",
+        file_w = file_col_width,
+        ins_w = ins_col,
+        del_w = del_col
+    );
+    // Total row
+    println!(
+        "  │ {:<file_w$}│\x1b[32m{:^ins_w$}\x1b[0m│\x1b[31m{:^del_w$}\x1b[0m│",
+        format!("Total ({} files)", staged_files.len()),
+        format!("+{}", total_insertions),
+        format!("-{}", total_deletions),
+        file_w = file_col_width - 1,
+        ins_w = ins_col,
+        del_w = del_col
+    );
+    // Bottom border
+    println!(
+        "  └{:─<file_w$}┴{:─<ins_w$}┴{:─<del_w$}┘",
+        "",
+        "",
+        "",
+        file_w = file_col_width,
+        ins_w = ins_col,
+        del_w = del_col
+    );
 
     // Get config
     let config = ConfigManager::get_merged_config()?;
