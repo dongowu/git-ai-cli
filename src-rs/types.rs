@@ -37,6 +37,15 @@ pub struct FileStat {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiffStatistics {
+    pub total_insertions: u32,
+    pub total_deletions: u32,
+    pub total_modifications: u32,
+    pub files_changed: u32,
+    pub file_stats: Vec<FileStat>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommitMessageOutput {
     pub messages: Vec<String>,
     pub staged_files: Vec<String>,

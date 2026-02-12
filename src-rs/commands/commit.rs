@@ -156,6 +156,12 @@ pub async fn run(
         del_w = del_col
     );
 
+    // Show diff statistics
+    match GitManager::get_diff_summary() {
+        Ok(summary) => println!("\n{}", summary),
+        Err(e) => eprintln!("⚠️  Failed to get diff statistics: {}", e),
+    }
+
     // Get config
     let config = ConfigManager::get_merged_config()?;
 
