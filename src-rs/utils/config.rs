@@ -69,14 +69,12 @@ impl ConfigManager {
             config.provider = provider;
         }
 
-        // API Key
+        // API Key -- only explicit git-ai env vars override file config.
+        // Generic fallbacks (OPENAI_API_KEY, DEEPSEEK_API_KEY) are handled
+        // separately in get_merged_config() as a last resort.
         if let Ok(api_key) = std::env::var("GIT_AI_API_KEY") {
             config.api_key = api_key;
         } else if let Ok(api_key) = std::env::var("OCO_API_KEY") {
-            config.api_key = api_key;
-        } else if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
-            config.api_key = api_key;
-        } else if let Ok(api_key) = std::env::var("DEEPSEEK_API_KEY") {
             config.api_key = api_key;
         }
 
@@ -155,6 +153,10 @@ impl ConfigManager {
     }
 
     /// Merge configs with priority: env > local > global
+    ///
+    /// Generic env vars (OPENAI_API_KEY, DEEPSEEK_API_KEY) are only used as a
+    /// last-resort fallback when no API key is configured in any config file or
+    /// explicit git-ai env var.
     pub fn get_merged_config() -> Result<AIConfig> {
         let global = Self::read_global_config()?;
         let local = Self::read_local_config()?;
@@ -188,7 +190,7 @@ impl ConfigManager {
             merged.enable_footer = local.enable_footer;
         }
 
-        // Merge env config (highest priority)
+        // Merge env config (highest priority -- only explicit git-ai vars)
         if !env.provider.is_empty() {
             merged.provider = env.provider;
         }
@@ -212,6 +214,16 @@ impl ConfigManager {
         }
         if env.enable_footer.is_some() {
             merged.enable_footer = env.enable_footer;
+        }
+
+        // Last-resort fallback: use generic env vars only when no API key is
+        // configured from any file or explicit env var.
+        if merged.api_key.is_empty() {
+            if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
+                merged.api_key = api_key;
+            } else if let Ok(api_key) = std::env::var("DEEPSEEK_API_KEY") {
+                merged.api_key = api_key;
+            }
         }
 
         Ok(merged)
@@ -266,32 +278,5 @@ impl ConfigManager {
                 .map_err(|e| GitAiError::Config(format!("Failed to delete config: {}", e)))?;
         }
         Ok(())
-    }
-
-    /// Redact secrets from a string (for error messages)
-    #[allow(dead_code)]
-    pub fn redact_secrets(input: &str) -> String {
-        let mut result = input.to_string();
-
-        // Redact API keys (sk-... format)
-        result = regex::Regex::new(r"sk-[a-zA-Z0-9]{20,}")
-            .unwrap()
-            .replace_all(&result, "sk-****...")
-            .to_string();
-
-        // Redact long tokens (>24 chars)
-        result = regex::Regex::new(r"([a-zA-Z0-9_-]{24,})")
-            .unwrap()
-            .replace_all(&result, |caps: &regex::Captures| {
-                let token = &caps[1];
-                if token.len() > 6 {
-                    format!("{}****{}", &token[..3], &token[token.len() - 3..])
-                } else {
-                    "****".to_string()
-                }
-            })
-            .to_string();
-
-        result
     }
 }

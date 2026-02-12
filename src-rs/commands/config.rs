@@ -3,47 +3,73 @@ use crate::types::{get_provider_presets, AIConfig};
 use crate::utils::ConfigManager;
 use dialoguer::{Confirm, Input, Select};
 
-pub async fn run(subcommand: Option<String>, local: bool) -> Result<()> {
-    match subcommand.as_deref() {
-        Some("get") => run_get(local).await,
-        Some("set") => {
-            eprintln!("Config set requires key and value arguments");
-            Err(crate::error::GitAiError::InvalidArgument(
-                "Usage: git-ai config set <key> <value>".to_string(),
-            ))
-        }
-        Some("describe") => run_describe().await,
-        None => run_wizard(local).await,
-        Some(cmd) => Err(crate::error::GitAiError::InvalidArgument(format!(
-            "Unknown config subcommand: {}",
-            cmd
-        ))),
-    }
-}
-
-async fn run_get(local: bool) -> Result<()> {
+pub async fn run_get(local: bool, json: bool) -> Result<()> {
     let config = if local {
         ConfigManager::read_local_config()?
     } else {
         ConfigManager::get_merged_config()?
     };
 
-    println!("Current configuration:");
-    println!("  Provider: {}", config.provider);
-    println!("  Model: {}", config.model);
-    println!("  Locale: {}", config.locale);
-    if let Some(agent_model) = &config.agent_model {
-        println!("  Agent Model: {}", agent_model);
+    if json {
+        println!("{}", serde_json::to_string_pretty(&config)?);
+    } else {
+        println!("Current configuration:");
+        println!("  Provider: {}", config.provider);
+        println!("  Model: {}", config.model);
+        println!("  Locale: {}", config.locale);
+        if let Some(agent_model) = &config.agent_model {
+            println!("  Agent Model: {}", agent_model);
+        }
+        if let Some(custom_prompt) = &config.custom_prompt {
+            println!("  Custom Prompt: {} chars", custom_prompt.len());
+        }
+        println!("  Enable Footer: {}", config.enable_footer.unwrap_or(true));
     }
-    if let Some(custom_prompt) = &config.custom_prompt {
-        println!("  Custom Prompt: {} chars", custom_prompt.len());
-    }
-    println!("  Enable Footer: {}", config.enable_footer.unwrap_or(true));
 
     Ok(())
 }
 
-async fn run_describe() -> Result<()> {
+pub async fn run_set(key: &str, value: &str, local: bool) -> Result<()> {
+    let mut config = if local {
+        ConfigManager::read_local_config()?
+    } else {
+        ConfigManager::read_global_config()?
+    };
+
+    match key {
+        "provider" => config.provider = value.to_string(),
+        "api_key" | "apiKey" => config.api_key = value.to_string(),
+        "base_url" | "baseUrl" => config.base_url = value.to_string(),
+        "model" => config.model = value.to_string(),
+        "agent_model" | "agentModel" => config.agent_model = Some(value.to_string()),
+        "locale" => config.locale = value.to_string(),
+        "custom_prompt" | "customPrompt" => config.custom_prompt = Some(value.to_string()),
+        "enable_footer" | "enableFooter" => {
+            config.enable_footer = Some(matches!(
+                value.to_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            ));
+        }
+        _ => {
+            return Err(crate::error::GitAiError::InvalidArgument(format!(
+                "Unknown config key: '{}'. Run 'git-ai config describe' for available keys.",
+                key
+            )));
+        }
+    }
+
+    if local {
+        ConfigManager::write_local_config(&config)?;
+        println!("Set {} = {} (local)", key, value);
+    } else {
+        ConfigManager::write_global_config(&config)?;
+        println!("Set {} = {} (global)", key, value);
+    }
+
+    Ok(())
+}
+
+pub async fn run_describe() -> Result<()> {
     println!("Available configuration keys:");
     println!();
     println!("  provider          - AI provider name (required)");
@@ -77,7 +103,7 @@ async fn run_describe() -> Result<()> {
     Ok(())
 }
 
-async fn run_wizard(local: bool) -> Result<()> {
+pub async fn run_wizard(local: bool) -> Result<()> {
     println!("\n🔧 Git-AI Configuration Wizard\n");
 
     let presets = get_provider_presets();

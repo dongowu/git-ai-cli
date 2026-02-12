@@ -34,7 +34,12 @@ pub async fn run(
         .unwrap_or(5000);
 
     let (truncated_diff, truncated) = if diff.len() > max_diff_chars {
-        (diff[..max_diff_chars].to_string(), true)
+        // Find a valid UTF-8 char boundary to avoid panicking on multi-byte chars
+        let mut end = max_diff_chars;
+        while !diff.is_char_boundary(end) {
+            end -= 1;
+        }
+        (diff[..end].to_string(), true)
     } else {
         (diff, false)
     };

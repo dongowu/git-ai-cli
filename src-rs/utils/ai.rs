@@ -1,7 +1,9 @@
 use crate::error::{GitAiError, Result};
 use crate::types::AIConfig;
+use regex::Regex;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -211,23 +213,24 @@ impl AIClient {
 
     /// Redact secrets from error messages
     fn redact_secrets(input: &str) -> String {
+        static RE_API_KEY: OnceLock<Regex> = OnceLock::new();
+        static RE_BEARER: OnceLock<Regex> = OnceLock::new();
+        static RE_TOKEN: OnceLock<Regex> = OnceLock::new();
+
+        let re_api_key =
+            RE_API_KEY.get_or_init(|| Regex::new(r"sk-[a-zA-Z0-9]{20,}").expect("valid regex"));
+        let re_bearer = RE_BEARER
+            .get_or_init(|| Regex::new(r"Bearer\s+[a-zA-Z0-9_-]{20,}").expect("valid regex"));
+        let re_token =
+            RE_TOKEN.get_or_init(|| Regex::new(r"([a-zA-Z0-9_-]{24,})").expect("valid regex"));
+
         let mut result = input.to_string();
 
-        // Redact API keys (sk-... format)
-        result = regex::Regex::new(r"sk-[a-zA-Z0-9]{20,}")
-            .unwrap()
-            .replace_all(&result, "sk-****...")
-            .to_string();
+        result = re_api_key.replace_all(&result, "sk-****...").to_string();
 
-        // Redact Bearer tokens
-        result = regex::Regex::new(r"Bearer\s+[a-zA-Z0-9_-]{20,}")
-            .unwrap()
-            .replace_all(&result, "Bearer ****...")
-            .to_string();
+        result = re_bearer.replace_all(&result, "Bearer ****...").to_string();
 
-        // Redact long tokens (>24 chars)
-        result = regex::Regex::new(r"([a-zA-Z0-9_-]{24,})")
-            .unwrap()
+        result = re_token
             .replace_all(&result, |caps: &regex::Captures| {
                 let token = &caps[1];
                 if token.len() > 6 {

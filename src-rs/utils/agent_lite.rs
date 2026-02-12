@@ -1,6 +1,7 @@
 use crate::error::Result;
 use crate::utils::GitManager;
 use regex::Regex;
+use std::sync::OnceLock;
 
 pub struct AgentLite;
 
@@ -22,20 +23,25 @@ impl AgentLite {
 
     /// Extract candidate symbols from diff (functions, classes, types)
     pub fn extract_candidate_symbols(diff: &str) -> Vec<String> {
+        static RE_FUNC: OnceLock<Regex> = OnceLock::new();
+        static RE_CLASS: OnceLock<Regex> = OnceLock::new();
+
+        let func_regex = RE_FUNC.get_or_init(|| {
+            Regex::new(r"(?:^|\n)\+.*(?:fn|function|def|async fn)\s+(\w+)\s*\(")
+                .expect("valid regex")
+        });
+        let class_regex = RE_CLASS.get_or_init(|| {
+            Regex::new(r"(?:^|\n)\+.*(?:class|struct|interface|type)\s+(\w+)").expect("valid regex")
+        });
+
         let mut symbols = Vec::new();
 
-        // Match function definitions
-        let func_regex =
-            Regex::new(r"(?:^|\n)\+.*(?:fn|function|def|async fn)\s+(\w+)\s*\(").unwrap();
         for cap in func_regex.captures_iter(diff) {
             if let Some(name) = cap.get(1) {
                 symbols.push(name.as_str().to_string());
             }
         }
 
-        // Match class/struct definitions
-        let class_regex =
-            Regex::new(r"(?:^|\n)\+.*(?:class|struct|interface|type)\s+(\w+)").unwrap();
         for cap in class_regex.captures_iter(diff) {
             if let Some(name) = cap.get(1) {
                 symbols.push(name.as_str().to_string());

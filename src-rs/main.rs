@@ -209,18 +209,14 @@ async fn run(cli: Cli) -> Result<()> {
             local,
             global: _,
         }) => match subcommand {
-            Some(ConfigSubcommand::Get { json: _, local }) => {
-                commands::config::run(Some("get".to_string()), local).await
+            Some(ConfigSubcommand::Get { json, local }) => {
+                commands::config::run_get(local, json).await
             }
-            Some(ConfigSubcommand::Set {
-                key: _,
-                value: _,
-                local,
-            }) => commands::config::run(Some("set".to_string()), local).await,
-            Some(ConfigSubcommand::Describe) => {
-                commands::config::run(Some("describe".to_string()), false).await
+            Some(ConfigSubcommand::Set { key, value, local }) => {
+                commands::config::run_set(&key, &value, local).await
             }
-            None => commands::config::run(None, local).await,
+            Some(ConfigSubcommand::Describe) => commands::config::run_describe().await,
+            None => commands::config::run_wizard(local).await,
         },
         Some(Commands::Hook { subcommand, global }) => match subcommand {
             HookSubcommand::Install => commands::hook::run("install".to_string(), global).await,
