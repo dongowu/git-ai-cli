@@ -52,6 +52,21 @@ pub async fn run(
 
     println!("Found {} commits\n", commits.len());
 
+    let max_commits = std::env::var("GIT_AI_REPORT_MAX_COMMITS")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(200);
+    let total_commits = commits.len();
+    let commits_for_prompt: Vec<String> = commits.into_iter().take(max_commits).collect();
+
+    if total_commits > commits_for_prompt.len() {
+        println!(
+            "⚠️  Commit list truncated for AI context: using {} of {} commits\n",
+            commits_for_prompt.len(),
+            total_commits
+        );
+    }
+
     // Get config
     let config = ConfigManager::get_merged_config()?;
 
@@ -66,14 +81,18 @@ pub async fn run(
     };
     let user_prompt = if range_mode {
         format!(
-            "Current service: git-ai-cli (Rust 2.x).\nCommit range: {}\n\nPlease generate release notes focused on functional changes and service impact:\n\n{}",
+            "Current service: git-ai-cli (Rust 2.x).\nCommit range: {}\nTotal commits in range: {}\nCommits included in context: {}\n\nPlease generate release notes focused on functional changes and service impact:\n\n{}",
             scope,
-            commits.join("\n")
+            total_commits,
+            commits_for_prompt.len(),
+            commits_for_prompt.join("\n")
         )
     } else {
         format!(
-            "Generate a structured report for the following commits:\n\n{}",
-            commits.join("\n")
+            "Total commits in scope: {}\nCommits included in context: {}\n\nGenerate a structured report for the following commits:\n\n{}",
+            total_commits,
+            commits_for_prompt.len(),
+            commits_for_prompt.join("\n")
         )
     };
 

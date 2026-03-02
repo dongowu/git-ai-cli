@@ -55,12 +55,6 @@ impl AgentLite {
         symbols
     }
 
-    /// Search for symbol usage in codebase
-    pub async fn search_symbol_usage(symbol: &str) -> Result<Vec<String>> {
-        let results = GitManager::search_code(symbol)?;
-        Ok(results.iter().take(80).cloned().collect())
-    }
-
     /// Extract scope from branch name
     pub fn extract_scope_from_branch(branch_name: &str) -> Option<String> {
         // feature/user-auth -> user-auth
@@ -114,14 +108,21 @@ impl AgentLite {
 
         // Search for symbol usage
         let mut usage_info = String::new();
+        let mut tasks = Vec::new();
         for symbol in &symbols {
-            if let Ok(results) = Self::search_symbol_usage(symbol).await {
-                if !results.is_empty() {
-                    usage_info.push_str(&format!(
-                        "\nSymbol '{}' found in {} locations",
-                        symbol,
-                        results.len()
-                    ));
+            let symbol = symbol.clone();
+            tasks.push(tokio::task::spawn_blocking(move || {
+                let count = GitManager::search_code(&symbol)
+                    .map(|results| results.len())
+                    .unwrap_or(0);
+                (symbol, count)
+            }));
+        }
+
+        for task in tasks {
+            if let Ok((symbol, count)) = task.await {
+                if count > 0 {
+                    usage_info.push_str(&format!("\nSymbol '{}' found in {} locations", symbol, count));
                 }
             }
         }

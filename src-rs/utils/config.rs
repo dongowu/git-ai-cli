@@ -180,7 +180,7 @@ impl ConfigManager {
         if local.agent_model.is_some() {
             merged.agent_model = local.agent_model;
         }
-        if !local.locale.is_empty() && local.locale != "en" {
+        if !local.locale.is_empty() {
             merged.locale = local.locale;
         }
         if local.custom_prompt.is_some() {
@@ -206,7 +206,7 @@ impl ConfigManager {
         if env.agent_model.is_some() {
             merged.agent_model = env.agent_model;
         }
-        if !env.locale.is_empty() && env.locale != "en" {
+        if !env.locale.is_empty() {
             merged.locale = env.locale;
         }
         if env.custom_prompt.is_some() {

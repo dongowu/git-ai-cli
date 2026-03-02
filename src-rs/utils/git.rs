@@ -300,6 +300,8 @@ impl GitManager {
         let output = Command::new("git")
             .arg("grep")
             .arg("-n")
+            .arg("-F")
+            .arg("--")
             .arg(pattern)
             .output()
             .map_err(|e| GitAiError::Git(format!("Failed to search code: {}", e)))?;

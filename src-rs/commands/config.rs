@@ -58,12 +58,17 @@ pub async fn run_set(key: &str, value: &str, local: bool) -> Result<()> {
         }
     }
 
+    let display_value = match key {
+        "api_key" | "apiKey" => "****".to_string(),
+        _ => value.to_string(),
+    };
+
     if local {
         ConfigManager::write_local_config(&config)?;
-        println!("Set {} = {} (local)", key, value);
+        println!("Set {} = {} (local)", key, display_value);
     } else {
         ConfigManager::write_global_config(&config)?;
-        println!("Set {} = {} (global)", key, value);
+        println!("Set {} = {} (global)", key, display_value);
     }
 
     Ok(())

@@ -380,11 +380,20 @@ pub async fn run(
 }
 
 fn edit_message(original: &str) -> Result<String> {
+    use std::time::{SystemTime, UNIX_EPOCH};
     use std::io::Write;
 
     // Create a temporary file
     let temp_dir = std::env::temp_dir();
-    let temp_file = temp_dir.join("git-ai-commit-msg.txt");
+    let unique_suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let temp_file = temp_dir.join(format!(
+        "git-ai-commit-msg-{}-{}.txt",
+        std::process::id(),
+        unique_suffix
+    ));
 
     // Write original message to temp file
     let mut file = std::fs::File::create(&temp_file).map_err(|e| {

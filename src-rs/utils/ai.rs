@@ -2,9 +2,11 @@ use crate::error::{GitAiError, Result};
 use crate::types::AIConfig;
 use regex::Regex;
 use reqwest::Client;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 use std::time::Duration;
+use tokio::time::sleep;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
@@ -107,32 +109,7 @@ impl AIClient {
             stream: None,
         };
 
-        let response = self
-            .client
-            .post(format!("{}/chat/completions", self.config.base_url))
-            .header("Authorization", format!("Bearer {}", self.config.api_key))
-            .json(&request)
-            .send()
-            .await
-            .map_err(|e| {
-                let error_msg = format!("HTTP request failed: {}", e);
-                GitAiError::Http(Self::redact_secrets(&error_msg))
-            })?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            let error_msg = format!("API error ({}): {}", status, body);
-            return Err(GitAiError::Ai(Self::redact_secrets(&error_msg)));
-        }
-
-        let completion: ChatCompletionResponse = response
-            .json()
-            .await
-            .map_err(|e| GitAiError::Ai(format!("Failed to parse response: {}", e)))?;
+        let completion = self.send_chat_completion(&request).await?;
 
         if completion.choices.is_empty() {
             return Err(GitAiError::Ai("No choices in response".to_string()));
@@ -170,32 +147,7 @@ impl AIClient {
             stream: None,
         };
 
-        let response = self
-            .client
-            .post(format!("{}/chat/completions", self.config.base_url))
-            .header("Authorization", format!("Bearer {}", self.config.api_key))
-            .json(&request)
-            .send()
-            .await
-            .map_err(|e| {
-                let error_msg = format!("HTTP request failed: {}", e);
-                GitAiError::Http(Self::redact_secrets(&error_msg))
-            })?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            let error_msg = format!("API error ({}): {}", status, body);
-            return Err(GitAiError::Ai(Self::redact_secrets(&error_msg)));
-        }
-
-        let completion: ChatCompletionResponse = response
-            .json()
-            .await
-            .map_err(|e| GitAiError::Ai(format!("Failed to parse response: {}", e)))?;
+        let completion = self.send_chat_completion(&request).await?;
 
         if completion.choices.is_empty() {
             return Err(GitAiError::Ai("No choices in response".to_string()));
@@ -209,6 +161,68 @@ impl AIClient {
             .collect();
 
         Ok(messages)
+    }
+
+    async fn send_chat_completion(
+        &self,
+        request: &ChatCompletionRequest,
+    ) -> Result<ChatCompletionResponse> {
+        let url = format!("{}/chat/completions", self.config.base_url);
+        let max_attempts = 3;
+
+        for attempt in 0..max_attempts {
+            let mut req = self.client.post(&url).json(request);
+            if Self::provider_requires_auth(&self.config.provider) && !self.config.api_key.is_empty() {
+                req = req.header("Authorization", format!("Bearer {}", self.config.api_key));
+            }
+
+            let response = match req.send().await {
+                Ok(response) => response,
+                Err(e) => {
+                    if attempt + 1 < max_attempts {
+                        sleep(Self::retry_delay(attempt)).await;
+                        continue;
+                    }
+                    let error_msg = format!("HTTP request failed: {}", e);
+                    return Err(GitAiError::Http(Self::redact_secrets(&error_msg)));
+                }
+            };
+
+            if response.status().is_success() {
+                return response
+                    .json()
+                    .await
+                    .map_err(|e| GitAiError::Ai(format!("Failed to parse response: {}", e)));
+            }
+
+            let status = response.status();
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+
+            if (status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error())
+                && attempt + 1 < max_attempts
+            {
+                sleep(Self::retry_delay(attempt)).await;
+                continue;
+            }
+
+            let error_msg = format!("API error ({}): {}", status, body);
+            return Err(GitAiError::Ai(Self::redact_secrets(&error_msg)));
+        }
+
+        Err(GitAiError::Http(
+            "HTTP request failed after retries".to_string(),
+        ))
+    }
+
+    fn provider_requires_auth(provider: &str) -> bool {
+        provider != "ollama" && provider != "lm-studio"
+    }
+
+    fn retry_delay(attempt: usize) -> Duration {
+        Duration::from_millis(300 * (1u64 << attempt.min(3)))
     }
 
     /// Redact secrets from error messages
@@ -242,6 +256,24 @@ impl AIClient {
             .to_string();
 
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AIClient;
+
+    #[test]
+    fn local_providers_do_not_require_auth_header() {
+        assert!(!AIClient::provider_requires_auth("ollama"));
+        assert!(!AIClient::provider_requires_auth("lm-studio"));
+        assert!(AIClient::provider_requires_auth("openai"));
+    }
+
+    #[test]
+    fn retry_delay_increases() {
+        assert!(AIClient::retry_delay(1) > AIClient::retry_delay(0));
+        assert!(AIClient::retry_delay(2) > AIClient::retry_delay(1));
     }
 }
 

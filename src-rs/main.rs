@@ -11,7 +11,7 @@ use error::Result;
 #[derive(Parser)]
 #[command(name = "git-ai")]
 #[command(about = "Generate git commit messages using AI", long_about = None)]
-#[command(version = "2.0.3")]
+#[command(version = "2.0.5")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -180,16 +180,6 @@ async fn main() {
 }
 
 async fn run(cli: Cli) -> Result<()> {
-    // Check if git is installed
-    if !utils::GitManager::is_git_installed() {
-        return Err(error::GitAiError::GitNotInstalled);
-    }
-
-    // Check if in git repository
-    if !utils::GitManager::is_in_git_repo()? {
-        return Err(error::GitAiError::NotInGitRepo);
-    }
-
     match cli.command {
         Some(Commands::Commit {
             yes,
@@ -197,13 +187,19 @@ async fn run(cli: Cli) -> Result<()> {
             locale,
             agent,
             copilot,
-        }) => commands::commit::run(yes, num, locale, agent, copilot).await,
+        }) => {
+            ensure_git_ready()?;
+            commands::commit::run(yes, num, locale, agent, copilot).await
+        }
         Some(Commands::Msg {
             num,
             json,
             quiet,
             locale,
-        }) => commands::msg::run(num, json, quiet, locale).await,
+        }) => {
+            ensure_git_ready()?;
+            commands::msg::run(num, json, quiet, locale).await
+        }
         Some(Commands::Config {
             subcommand,
             local,
@@ -218,20 +214,50 @@ async fn run(cli: Cli) -> Result<()> {
             Some(ConfigSubcommand::Describe) => commands::config::run_describe().await,
             None => commands::config::run_wizard(local).await,
         },
-        Some(Commands::Hook { subcommand, global }) => match subcommand {
-            HookSubcommand::Install => commands::hook::run("install".to_string(), global).await,
-            HookSubcommand::Remove => commands::hook::run("remove".to_string(), global).await,
-            HookSubcommand::Status => commands::hook::run("status".to_string(), global).await,
-        },
+        Some(Commands::Hook { subcommand, global }) => {
+            ensure_git_installed()?;
+            if !global {
+                ensure_in_git_repo()?;
+            }
+
+            match subcommand {
+                HookSubcommand::Install => commands::hook::run("install".to_string(), global).await,
+                HookSubcommand::Remove => commands::hook::run("remove".to_string(), global).await,
+                HookSubcommand::Status => commands::hook::run("status".to_string(), global).await,
+            }
+        }
         Some(Commands::Report {
             days,
             from_last_tag,
             from_tag,
             to_ref,
-        }) => commands::report::run(days, from_last_tag, from_tag, to_ref).await,
+        }) => {
+            ensure_git_ready()?;
+            commands::report::run(days, from_last_tag, from_tag, to_ref).await
+        }
         None => {
             // Default: interactive commit
+            ensure_git_ready()?;
             commands::commit::run(cli.yes, cli.num, cli.locale, cli.agent, cli.copilot).await
         }
     }
+}
+
+fn ensure_git_installed() -> Result<()> {
+    if !utils::GitManager::is_git_installed() {
+        return Err(error::GitAiError::GitNotInstalled);
+    }
+    Ok(())
+}
+
+fn ensure_in_git_repo() -> Result<()> {
+    if !utils::GitManager::is_in_git_repo()? {
+        return Err(error::GitAiError::NotInGitRepo);
+    }
+    Ok(())
+}
+
+fn ensure_git_ready() -> Result<()> {
+    ensure_git_installed()?;
+    ensure_in_git_repo()
 }
